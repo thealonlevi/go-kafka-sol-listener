@@ -1,0 +1,17 @@
+kafka:
+  bootstrap_servers:
+    - "rpk0.bitquery.io:9093"
+    - "rpk1.bitquery.io:9093"
+    - "rpk2.bitquery.io:9093"
+  group_id: "solanatest3-group-99"
+  topic: "solana.balance_updates"
+  security:
+    protocol: "SASL_SSL"
+    sasl_mechanisms: "SCRAM-SHA-512"
+    username: "solanatest3"
+    password: "fwMnnobFQuFGyPLDepgkRXP4IpoL81"
+    ssl_ca_location: "env/server.cer.pem"
+    ssl_key_location: "env/client.key.pem"
+    ssl_certificate_location: "env/client.cer.pem"
+    endpoint_identification_algorithm: "none"
+  auto_offset_reset: "latest"

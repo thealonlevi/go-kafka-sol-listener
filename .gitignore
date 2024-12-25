@@ -1,0 +1,44 @@
+# Go-related files
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go vendor directory
+/vendor/
+
+# Dependency files
+go.sum
+
+# Build directories
+bin/
+old/
+
+# Configuration files
+#.env
+#config/config.yaml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Certificates and private keys
+#env/*.key.pem
+#nv/*.cer.pem
+
+# IDE and editor files
+.idea/
+*.iml
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Git-specific
+*.orig
