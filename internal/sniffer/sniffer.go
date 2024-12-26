@@ -24,7 +24,9 @@ func NewSniffer(walletManager *wallet.WalletManager, outputFile string) *Sniffer
 
 func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	matchedMessages := []map[string]interface{}{}
-
+	if s.walletManager.WalletExists("87odpJf88CsHDyRkXxv1QHXK45NLZ6y915vJgKZuFCfy") {
+		log.Println("TRUE!!")
+	}
 	for _, message := range messages {
 		transaction, ok := message["Transaction"].(map[string]interface{})
 		if !ok {
