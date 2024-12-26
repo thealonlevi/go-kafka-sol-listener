@@ -1,14 +1,19 @@
-package internal
+package consumer
 
 import (
+	"encoding/json"
 	"fmt"
 	"go-kafka-sol-listener/internal/config"
+	"go-kafka-sol-listener/internal/sniffer"
 	"log"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-func StartConsumer(cfg *config.Config) error {
+func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 	// Join bootstrap servers into a single string
 	bootstrapServers := ""
 	for i, server := range cfg.Kafka.BootstrapServers {
@@ -43,8 +48,24 @@ func StartConsumer(cfg *config.Config) error {
 		return fmt.Errorf("failed to subscribe to topic: %w", err)
 	}
 
-	// Consume messages
+	// Consume messages and offload to sniffer every 500ms
 	fmt.Println("Consumer is now listening for messages...")
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	var batchedMessages []map[string]interface{}
+
+	go func() {
+		for range ticker.C {
+			if len(batchedMessages) > 0 {
+				log.Printf("Passing %d messages to sniffer", len(batchedMessages))
+				saveBatchToFile(batchedMessages)
+				go sniffer.HandleMessages(batchedMessages)
+				batchedMessages = []map[string]interface{}{} // Reset batched messages
+			}
+		}
+	}()
+
 	for {
 		ev := consumer.Poll(100)
 		if ev == nil {
@@ -53,10 +74,32 @@ func StartConsumer(cfg *config.Config) error {
 
 		switch e := ev.(type) {
 		case *kafka.Message:
-			log.Printf("Message received: %s [Partition: %d, Offset: %d]\n",
-				string(e.Value), e.TopicPartition.Partition, e.TopicPartition.Offset)
+			var messages []map[string]interface{} // Updated to handle arrays of messages
+			if err := json.Unmarshal(e.Value, &messages); err != nil {
+				log.Printf("Failed to unmarshal message: %v\n", err)
+				continue
+			}
+			// Add all messages from the array to the batch
+			for _, message := range messages {
+				batchedMessages = append(batchedMessages, message)
+			}
 		case kafka.Error:
 			log.Printf("Kafka error: %v\n", e)
 		}
+	}
+}
+
+func saveBatchToFile(messages []map[string]interface{}) {
+	timestamp := time.Now().Format("20060102_150405")
+	fileName := filepath.Join("dump", fmt.Sprintf("%s.json", timestamp))
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Printf("Failed to create dump file: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	if err := json.NewEncoder(file).Encode(messages); err != nil {
+		log.Printf("Failed to write messages to file: %v\n", err)
 	}
 }
