@@ -24,6 +24,7 @@ old/
 *.log
 *.tmp
 *.swp
+go-kafka-sol-listener-01
 
 # Certificates and private keys
 #env/*.key.pem

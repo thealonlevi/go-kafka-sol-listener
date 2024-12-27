@@ -1,9 +1,10 @@
 package sniffer
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
-	"os"
+	"net/http"
 	"sync"
 
 	"go-kafka-sol-listener/internal/wallet"
@@ -12,21 +13,19 @@ import (
 type Sniffer struct {
 	walletManager *wallet.WalletManager
 	mutex         sync.Mutex
-	outputFile    string
+	webhookURL    string
 }
 
-func NewSniffer(walletManager *wallet.WalletManager, outputFile string) *Sniffer {
+func NewSniffer(walletManager *wallet.WalletManager, webhookURL string) *Sniffer {
 	return &Sniffer{
 		walletManager: walletManager,
-		outputFile:    outputFile,
+		webhookURL:    webhookURL,
 	}
 }
 
 func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	matchedMessages := []map[string]interface{}{}
-	if s.walletManager.WalletExists("87odpJf88CsHDyRkXxv1QHXK45NLZ6y915vJgKZuFCfy") {
-		log.Println("TRUE!!")
-	}
+
 	for _, message := range messages {
 		transaction, ok := message["Transaction"].(map[string]interface{})
 		if !ok {
@@ -42,23 +41,16 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 		if s.walletManager.WalletExists(signer) {
 			matchedMessages = append(matchedMessages, message)
-			log.Println("BINGOO!!!!!")
+			log.Println("Match found for signer!")
 		}
 	}
 
-	s.saveMatchedMessages(matchedMessages)
+	s.sendMatchedMessages(matchedMessages)
 }
 
-func (s *Sniffer) saveMatchedMessages(messages []map[string]interface{}) {
+func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-
-	file, err := os.OpenFile(s.outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Printf("Failed to open file: %v\n", err)
-		return
-	}
-	defer file.Close()
 
 	for _, message := range messages {
 		jsonData, err := json.Marshal(message)
@@ -67,8 +59,15 @@ func (s *Sniffer) saveMatchedMessages(messages []map[string]interface{}) {
 			continue
 		}
 
-		if _, err := file.Write(append(jsonData, '\n')); err != nil {
-			log.Printf("Failed to write message to file: %v\n", err)
+		resp, err := http.Post(s.webhookURL, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Printf("Failed to send message to webhook: %v\n", err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("Webhook returned non-OK status: %s\n", resp.Status)
 		}
 	}
 }
