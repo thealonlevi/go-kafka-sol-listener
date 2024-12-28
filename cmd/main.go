@@ -34,7 +34,7 @@ func main() {
 	}()
 
 	// Initialize Sniffer with dump file path
-	snifferInstance := sniffer.NewSniffer(walletManager, "dump/matched.json")
+	snifferInstance := sniffer.NewSniffer(walletManager, "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/transactionWebhook")
 
 	// Start Kafka consumer
 	fmt.Println("Starting Kafka consumer...")
