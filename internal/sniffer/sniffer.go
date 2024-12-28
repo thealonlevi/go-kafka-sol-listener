@@ -55,13 +55,6 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		}
 	}
 
-	// Append the last message of the batch to matchedMessages, even if it doesn't match.
-	if len(messages) > 0 {
-		lastMessage := messages[len(messages)-1]
-		matchedMessages = append(matchedMessages, lastMessage)
-		log.Println("Added last message of the batch to matched messages.")
-	}
-
 	// Send matched messages to the webhook.
 	s.sendMatchedMessages(matchedMessages)
 }
