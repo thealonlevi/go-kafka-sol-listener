@@ -14,4 +14,4 @@ kafka:
     ssl_key_location: "env/client.key.pem"
     ssl_certificate_location: "env/client.cer.pem"
     endpoint_identification_algorithm: "none"
-  auto_offset_reset: "latest"
+  auto_offset_reset: "earliest"
