@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -31,6 +32,20 @@ func NewSniffer(walletManager *wallet.WalletManager, webhookURL string) *Sniffer
 
 // HandleMessages processes a batch of messages to find matches and send them to the webhook.
 func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
+	// Sort the messages by Block.Timestamp (lowest to highest) as the absolute first step.
+	sort.Slice(messages, func(i, j int) bool {
+		blockI, okI := messages[i]["Block"].(map[string]interface{})
+		blockJ, okJ := messages[j]["Block"].(map[string]interface{})
+		if okI && okJ {
+			timestampI, okTI := blockI["Timestamp"].(float64)
+			timestampJ, okTJ := blockJ["Timestamp"].(float64)
+			if okTI && okTJ {
+				return timestampI < timestampJ
+			}
+		}
+		return false // Default order if Block.Timestamp is invalid
+	})
+
 	// Record the start timestamp.
 	timestampStart := time.Now().Unix()
 
