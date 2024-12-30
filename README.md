@@ -1,18 +1,35 @@
-# Go Kafka Sol Listener
+# Go-Kafka-Sol-Listener
 
-Go Kafka Sol Listener is a robust application designed to listen to Kafka messages, process Solana blockchain transactions, and integrate with webhooks for real-time updates. This project is highly scalable, efficient, and well-suited for handling large volumes of transactions.
+## Overview
+
+Go-Kafka-Sol-Listener is a high-performance application designed to process Solana blockchain transaction data from a Kafka stream. The application identifies transactions involving specific wallets, calculates performance metrics, and sends relevant data to a specified webhook.
+
+---
 
 ## Features
 
-- **Real-Time Transaction Processing**: Listens to Kafka topics for Solana blockchain transactions.
-- **In-Memory Cache**: Utilizes caching for optimized performance.
-- **Asynchronous Processing**: Handles multiple tasks simultaneously for efficient message consumption.
-- **Webhook Integration**: Sends matched transactions to configured webhooks.
-- **Dynamic Scaling**: Designed to handle high throughput with ease.
+1. **Kafka Consumer:**
+   - Subscribes to a Kafka topic and processes batches of messages.
 
-## Architecture
+2. **Wallet Matching:**
+   - Matches transactions based on a dynamic list of wallet addresses fetched from an external API.
 
-The project is modular and follows a well-defined structure:
+3. **Sniffer Metrics:**
+   - Calculates latency metrics including:
+     - Sniffer Latency
+     - Batch Latency
+     - Consumer Latency (1, 2, 3)
+     - Total Latency
+
+4. **Webhook Integration:**
+   - Sends matched transactions and performance data to a specified webhook.
+
+5. **Message Sorting:**
+   - Ensures all incoming messages are sorted by block timestamp for consistent processing.
+
+---
+
+## Project Directory Structure
 
 ```
 go-kafka-sol-listener/
@@ -33,91 +50,156 @@ go-kafka-sol-listener/
 │   │   └── sniffer.go        # Sniffing and processing Solana transactions
 │   └── wallet/
 │       └── wallet.go         # Wallet management logic
+├── test/
+│   └── test.go         # Test script for local debugging
 ├── .gitignore           # Git ignore file
 ├── go.mod               # Go module dependencies
 ├── go.sum               # Dependency checksums
+└── README.md            # Project documentation
 ```
 
-### Core Components
+---
 
-1. **Listener**:
-   - Connects to Kafka topics and listens for new messages.
-   - Maintains a persistent WebSocket connection.
+## Requirements
 
-2. **Processor**:
-   - Processes Solana transactions received from Kafka.
-   - Matches transactions against a list of wallets stored in DynamoDB.
+### Software
+- Go (1.23.3 or later)
+- librdkafka (for Confluent Kafka Go library)
 
-3. **Consumer**:
-   - Manages message consumption from Kafka topics.
-   - Ensures robust error handling and retries.
+### Libraries
+- `github.com/confluentinc/confluent-kafka-go` (v1.9.2)
+- `gopkg.in/yaml.v2` (v2.4.0)
 
-4. **Sniffer**:
-   - Implements the logic for decoding and analyzing Solana transactions.
+---
 
-5. **Wallet Management**:
-   - Handles wallet-related operations, such as fetching and updating wallet lists.
+## Installation
 
-6. **Configuration Management**:
-   - Centralized configuration loading through `config_loader.go`.
+### 1. Clone the Repository
+```bash
+$ git clone https://github.com/thealonlevi/go-kafka-sol-listener.git
+$ cd go-kafka-sol-listener
+```
 
-7. **Certificates and Security**:
-   - TLS certificates stored in the `env` folder for secure communication.
+### 2. Install Dependencies
+```bash
+$ go mod tidy
+```
 
-## Setup and Configuration
+### 3. Install librdkafka
+#### Ubuntu
+```bash
+$ sudo apt-get update
+$ sudo apt-get install -y librdkafka-dev
+```
+#### MacOS
+```bash
+$ brew install librdkafka
+```
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/yourusername/go-kafka-sol-listener.git
-   cd go-kafka-sol-listener
-   ```
+---
 
-2. **Install Dependencies**:
-   Ensure you have Go installed. Run:
-   ```bash
-   go mod tidy
-   ```
+## Configuration
 
-3. **Configure the Application**:
-   Update the `config/config.yaml` file with the following:
-   - Kafka Broker URL
-   - Solana WebSocket API URL
-   - Webhook URL
-   - AWS Lambda Endpoint
-   - Cache Update Interval
+The application configuration is managed via a `config.yaml` file located in the `config/` directory. Ensure the file contains the following fields:
 
-4. **Run the Application**:
-   ```bash
-   go run cmd/main.go
-   ```
+```yaml
+kafka:
+  bootstrap_servers:
+    - "localhost:9092"
+  group_id: "consumer-group"
+  topic: "transactions"
+  security:
+    protocol: "plaintext"
+    sasl_mechanisms: ""
+    username: ""
+    password: ""
+    ssl_ca_location: ""
+    ssl_key_location: ""
+    ssl_certificate_location: ""
+    endpoint_identification_algorithm: ""
+  auto_offset_reset: "earliest"
 
-## Usage
+webhook_url: "https://example.com/webhook"
+```
 
-1. Start the listener to begin processing Kafka messages.
-2. Monitor matched transactions being sent to the webhook endpoint.
-3. Use logs to debug or analyze real-time processing.
+---
 
-## Future Enhancements
+## Running the Application
 
-- **Batching Webhook Requests**: Improve performance by grouping transactions into batches.
-- **Bloom Filters**: Optimize cache performance with probabilistic data structures.
-- **Dynamic Configuration Reloading**: Allow runtime updates to the configuration file.
+### 1. Start the Consumer
+```bash
+$ go run cmd/main.go
+```
+
+### 2. Using TMUX for Multiple Instances
+To run multiple instances of the consumer:
+
+- Start TMUX session:
+```bash
+$ tmux new-session -s kafka-listener
+```
+- Start the application within TMUX:
+```bash
+$ go run cmd/main.go
+```
+- Detach from the session:
+```bash
+Ctrl+b, then d
+```
+- List TMUX sessions:
+```bash
+$ tmux list-sessions
+```
+- Reattach to a session:
+```bash
+$ tmux attach-session -t kafka-listener
+```
+
+---
+
+## Metrics Calculated
+
+### Latency Metrics
+- **Sniffer Latency:** Time taken by the sniffer to process a batch.
+- **Batch Latency:** Difference between the timestamps of the first and last message in the batch.
+- **Consumer Latency:** Measures the delay in processing messages at three points (start, middle, end).
+- **Total Latency:** End-to-end latency for the batch.
+
+### Example Output:
+```plaintext
+Sniffer Latency: 3 seconds
+Batch Latency: 10 seconds
+ConsumerLatency1: 5 seconds
+ConsumerLatency2: 6 seconds
+ConsumerLatency3: 8 seconds
+Total Latency: 11 seconds
+```
+
+---
+
+## Development Notes
+
+### Sorting Messages
+The first step in processing is sorting all incoming messages by the `Block.Timestamp` field (earliest to latest).
+
+### Thread-Safe Operations
+The application uses mutex locks to ensure thread safety when managing critical resources, such as sending matched messages.
+
+### Logging
+All significant operations are logged to the console for debugging and analysis.
+
+---
 
 ## Contributing
+Contributions are welcome! Please submit a pull request or open an issue for any bugs or feature requests.
 
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Submit a pull request with a detailed description.
+---
 
 ## License
+This project is licensed under the MIT License. See the LICENSE file for details.
 
-This project is licensed under the [MIT License](LICENSE).
+---
 
 ## Contact
+For any questions or support, please contact Alon Levi at [levialon@proton.me](mailto:levialon@proton.me).
 
-For questions or support, please reach out to the project maintainer:
-
-- **Name**: Alon Levi
-- **Email**: [levialon@proton.me](mailto:levialon@proton.me)
