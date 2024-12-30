@@ -74,8 +74,8 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	// Determine the key timestamps from the batch.
 	var timestamp1, timestampMiddle, timestampLast int64
 	if len(blockTimestamps) > 0 {
-		timestamp1 = blockTimestamps[0]
-		timestampLast = blockTimestamps[len(blockTimestamps)-1]
+		timestampLast = blockTimestamps[0]
+		timestamp1 = blockTimestamps[len(blockTimestamps)-1]
 		timestampMiddle = blockTimestamps[len(blockTimestamps)/2]
 	}
 
