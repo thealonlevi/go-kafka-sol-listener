@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"go-kafka-sol-listener/internal/wallet"
 )
@@ -30,9 +31,16 @@ func NewSniffer(walletManager *wallet.WalletManager, webhookURL string) *Sniffer
 
 // HandleMessages processes a batch of messages to find matches and send them to the webhook.
 func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
+	// Record the start timestamp.
+	timestampStart := time.Now().Unix()
+
 	// matchedMessages stores messages that match the wallet list.
 	matchedMessages := []map[string]interface{}{}
 
+	// Prepare a list to store timestamps from the Block field.
+	var blockTimestamps []int64
+
+	// Iterate through the messages to process them.
 	for _, message := range messages {
 		// Extract the transaction field from the message.
 		transaction, ok := message["Transaction"].(map[string]interface{})
@@ -53,7 +61,29 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			matchedMessages = append(matchedMessages, message)
 			log.Println("Match found for signer!")
 		}
+
+		// Extract the Block.Timestamp field if it exists.
+		block, ok := message["Block"].(map[string]interface{})
+		if ok {
+			if blockTimestamp, ok := block["Timestamp"].(float64); ok {
+				blockTimestamps = append(blockTimestamps, int64(blockTimestamp))
+			}
+		}
 	}
+
+	// Determine the key timestamps from the batch.
+	var timestamp1, timestampMiddle, timestampLast int64
+	if len(blockTimestamps) > 0 {
+		timestamp1 = blockTimestamps[0]
+		timestampLast = blockTimestamps[len(blockTimestamps)-1]
+		timestampMiddle = blockTimestamps[len(blockTimestamps)/2]
+	}
+
+	// Record the end timestamp.
+	timestampEnd := time.Now().Unix()
+
+	// Calculate and log metrics.
+	s.logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast)
 
 	// Send matched messages to the webhook.
 	s.sendMatchedMessages(matchedMessages)
@@ -85,5 +115,19 @@ func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Webhook returned non-OK status: %s\n", resp.Status)
 		}
+	}
+}
+
+// logMetrics calculates and logs the latency metrics.
+func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast int64) {
+	log.Printf("Sniffer Latency: %d seconds\n", timestampEnd-timestampStart)
+	if timestamp1 > 0 {
+		log.Printf("Batch Latency: %d seconds\n", timestampLast-timestamp1)
+		log.Printf("ConsumerLatency1: %d seconds\n", timestampStart-timestamp1)
+		log.Printf("ConsumerLatency2: %d seconds\n", timestampStart-timestampMiddle)
+		log.Printf("ConsumerLatency3: %d seconds\n", timestampStart-timestampLast)
+		log.Printf("Total Latency: %d seconds\n", timestampEnd-timestamp1)
+	} else {
+		log.Println("No valid timestamps found in the batch for latency calculations.")
 	}
 }
