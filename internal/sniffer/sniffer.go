@@ -141,6 +141,7 @@ func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1, timestamp
 		log.Printf("ConsumerLatency1: %d seconds\n", timestampStart-timestamp1)
 		log.Printf("ConsumerLatency2: %d seconds\n", timestampStart-timestampMiddle)
 		log.Printf("ConsumerLatency3: %d seconds\n", timestampStart-timestampLast)
+		log.Printf("Kafka Server Latency: %d seconds\n", (timestampEnd-timestamp1)-(timestampLast-timestamp1))
 		log.Printf("Total Latency: %d seconds\n", timestampEnd-timestamp1)
 	} else {
 		log.Println("No valid timestamps found in the batch for latency calculations.")
