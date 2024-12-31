@@ -21,7 +21,7 @@ func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 		}
 	}
 
-	// Create Kafka consumer
+	// Create Kafka consumer!
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":                     bootstrapServers,
 		"group.id":                              cfg.Kafka.GroupID,
