@@ -43,7 +43,7 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	})
 
 	// Record the start timestamp.
-	timestampStart := time.Now().Unix()
+	timestampStart := time.Now().UnixMilli()
 
 	// matchedMessages stores messages that match the wallet list.
 	matchedMessages := []map[string]interface{}{}
@@ -88,7 +88,7 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	}
 
 	// Record the end timestamp.
-	timestampEnd := time.Now().Unix()
+	timestampEnd := time.Now().UnixMilli()
 
 	// Calculate and log metrics.
 	s.logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast)
@@ -107,7 +107,7 @@ func getBlockTimestamp(message map[string]interface{}) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
-	return int64(timestamp), true
+	return int64(timestamp * 1000), true // Convert seconds to milliseconds
 }
 
 // sendMatchedMessages sends matched messages to the webhook URL.
@@ -141,16 +141,16 @@ func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 
 // logMetrics calculates and logs the latency metrics.
 func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast int64) {
-	log.Printf("Sniffer Latency: %d seconds\n", timestampEnd-timestampStart)
+	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart)
 	if timestamp1 > 0 {
-		log.Printf("Batch Latency: %d seconds\n", timestampLast-timestamp1)
-		log.Printf("ConsumerLatency1: %d seconds\n", timestampStart-timestamp1)
-		log.Printf("ConsumerLatency2: %d seconds\n", timestampStart-timestampMiddle)
-		log.Printf("ConsumerLatency3: %d seconds\n", timestampStart-timestampLast)
-		log.Printf("Kafka Server Latency: %d seconds\n", (timestampEnd-timestamp1)-(timestampLast-timestamp1))
-		log.Printf("Total Latency: %d seconds\n", timestampEnd-timestamp1)
-		log.Printf("Timestamp1: %d seconds\n", timestamp1)
-		log.Printf("TimestampLast: %d seconds\n", timestampLast)
+		log.Printf("Batch Latency: %d ms\n", timestampLast-timestamp1)
+		log.Printf("ConsumerLatency1: %d ms\n", timestampStart-timestamp1)
+		log.Printf("ConsumerLatency2: %d ms\n", timestampStart-timestampMiddle)
+		log.Printf("ConsumerLatency3: %d ms\n", timestampStart-timestampLast)
+		log.Printf("Kafka Server Latency: %d ms\n", (timestampEnd-timestamp1)-(timestampLast-timestamp1))
+		log.Printf("Total Latency: %d ms\n", timestampEnd-timestamp1)
+		log.Printf("Timestamp1: %d ms\n", timestamp1)
+		log.Printf("TimestampLast: %d ms\n", timestampLast)
 	} else {
 		log.Println("No valid timestamps found in the batch for latency calculations.")
 	}
