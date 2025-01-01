@@ -34,16 +34,12 @@ func NewSniffer(walletManager *wallet.WalletManager, webhookURL string) *Sniffer
 func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	// Sort the messages by Block.Timestamp (lowest to highest) as the absolute first step.
 	sort.Slice(messages, func(i, j int) bool {
-		blockI, okI := messages[i]["Block"].(map[string]interface{})
-		blockJ, okJ := messages[j]["Block"].(map[string]interface{})
+		tsI, okI := getBlockTimestamp(messages[i])
+		tsJ, okJ := getBlockTimestamp(messages[j])
 		if okI && okJ {
-			timestampI, okTI := blockI["Timestamp"].(float64)
-			timestampJ, okTJ := blockJ["Timestamp"].(float64)
-			if okTI && okTJ {
-				return timestampI < timestampJ
-			}
+			return tsI < tsJ
 		}
-		return false // Default order if Block.Timestamp is invalid
+		return false
 	})
 
 	// Record the start timestamp.
@@ -78,11 +74,8 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		}
 
 		// Extract the Block.Timestamp field if it exists.
-		block, ok := message["Block"].(map[string]interface{})
-		if ok {
-			if blockTimestamp, ok := block["Timestamp"].(float64); ok {
-				blockTimestamps = append(blockTimestamps, int64(blockTimestamp))
-			}
+		if blockTimestamp, ok := getBlockTimestamp(message); ok {
+			blockTimestamps = append(blockTimestamps, blockTimestamp)
 		}
 	}
 
@@ -102,6 +95,19 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 	// Send matched messages to the webhook.
 	s.sendMatchedMessages(matchedMessages)
+}
+
+// getBlockTimestamp safely extracts the Block.Timestamp value from a message.
+func getBlockTimestamp(message map[string]interface{}) (int64, bool) {
+	block, ok := message["Block"].(map[string]interface{})
+	if !ok {
+		return 0, false
+	}
+	timestamp, ok := block["Timestamp"].(float64)
+	if !ok {
+		return 0, false
+	}
+	return int64(timestamp), true
 }
 
 // sendMatchedMessages sends matched messages to the webhook URL.
