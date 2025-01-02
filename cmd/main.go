@@ -33,12 +33,16 @@ func main() {
 		}
 	}()
 
-	// Initialize Sniffer with dump file path
+	// Initialize Sniffer with webhook URL
 	snifferInstance := sniffer.NewSniffer(walletManager, "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/transactionWebhook")
 
-	// Start Kafka consumer
-	fmt.Println("Starting Kafka consumer...")
-	if err := consumer.StartConsumer(cfg, snifferInstance); err != nil {
-		log.Fatalf("Failed to start Kafka consumer: %v", err)
+	// Restart logic for the Kafka consumer
+	for {
+		fmt.Println("Starting Kafka consumer...")
+		err := consumer.StartConsumer(cfg, snifferInstance) // Updated to return an error
+		if err != nil {
+			log.Printf("Kafka consumer encountered an error: %v. Restarting in 5 seconds...", err)
+			time.Sleep(5 * time.Second) // Wait before restarting
+		}
 	}
 }

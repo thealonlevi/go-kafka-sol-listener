@@ -11,8 +11,9 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
+// StartConsumer initializes the Kafka consumer and processes messages.
 func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
-	// Join bootstrap servers into a single string
+	// Join bootstrap servers into a single string.
 	bootstrapServers := ""
 	for i, server := range cfg.Kafka.BootstrapServers {
 		bootstrapServers += server
@@ -21,7 +22,7 @@ func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 		}
 	}
 
-	// Create Kafka consumer!
+	// Create Kafka consumer.
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":                     bootstrapServers,
 		"group.id":                              cfg.Kafka.GroupID,
@@ -40,29 +41,31 @@ func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 	}
 	defer consumer.Close()
 
-	// Subscribe to Kafka topic
+	// Subscribe to Kafka topic.
 	err = consumer.SubscribeTopics([]string{cfg.Kafka.Topic}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to topic: %w", err)
 	}
 
-	// Consume messages and offload to sniffer every 500ms
+	// Consume messages and offload to sniffer every 1000ms.
 	fmt.Println("Consumer is now listening for messages...")
 	ticker := time.NewTicker(1000 * time.Millisecond)
 	defer ticker.Stop()
 
 	var batchedMessages []map[string]interface{}
 
+	// Goroutine to periodically process messages.
 	go func() {
 		for range ticker.C {
 			if len(batchedMessages) > 0 {
-				log.Printf("Passing %d messages to sniffer", len(batchedMessages))
-				go sniffer.HandleMessages(batchedMessages)
-				batchedMessages = []map[string]interface{}{} // Reset batched messages
+				messagesToProcess := batchedMessages
+				batchedMessages = nil // Reset the batch.
+				go sniffer.HandleMessages(messagesToProcess)
 			}
 		}
 	}()
 
+	// Main loop to poll Kafka messages.
 	for {
 		ev := consumer.Poll(100)
 		if ev == nil {
@@ -71,17 +74,26 @@ func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 
 		switch e := ev.(type) {
 		case *kafka.Message:
-			var messages []map[string]interface{} // Updated to handle arrays of messages
-			if err := json.Unmarshal(e.Value, &messages); err != nil {
-				log.Printf("Failed to unmarshal message: %v\n", err)
-				continue
-			}
-			// Add all messages from the array to the batch
-			for _, message := range messages {
-				batchedMessages = append(batchedMessages, message)
+			if err := handleKafkaMessage(e, &batchedMessages); err != nil {
+				log.Printf("Failed to handle Kafka message: %v", err)
 			}
 		case kafka.Error:
-			log.Printf("Kafka error: %v\n", e)
+			log.Printf("Kafka error: %v", e)
+			if e.IsFatal() {
+				return fmt.Errorf("fatal Kafka error: %w", e)
+			}
+		default:
+			log.Printf("Ignored event: %v", e)
 		}
 	}
+}
+
+// handleKafkaMessage processes a Kafka message and appends it to the batch.
+func handleKafkaMessage(msg *kafka.Message, batch *[]map[string]interface{}) error {
+	var messages []map[string]interface{}
+	if err := json.Unmarshal(msg.Value, &messages); err != nil {
+		return fmt.Errorf("unmarshal failed: %w", err)
+	}
+	*batch = append(*batch, messages...)
+	return nil
 }
