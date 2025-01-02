@@ -3,7 +3,7 @@ kafka:
     - "rpk0.bitquery.io:9093"
     - "rpk1.bitquery.io:9093"
     - "rpk2.bitquery.io:9093"
-  group_id: "solanatest3-group-97"
+  group_id: "solanatest3-group-96"
   topic: "solana.balance_updates"
   security:
     protocol: "SASL_SSL"
