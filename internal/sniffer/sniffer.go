@@ -70,26 +70,10 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 		// Check if the signer exists in the wallet list.
 		if s.walletManager.WalletExists(signer) {
-			// Pass the message to the interpreter for swap detection.
-			jsonData, err := json.Marshal(message)
-			if err != nil {
-				log.Printf("Failed to marshal message for interpretation: %v\n", err)
-				continue
-			}
-
-			result, err := interpreter.DetectSwap(jsonData)
-			if err != nil {
-				log.Printf("Failed to detect swap: %v\n", err)
-				continue
-			}
-
-			if result != "No swap detected" {
-				matchedMessages = append(matchedMessages, map[string]interface{}{
-					"Message":     message,
-					"SwapDetails": result,
-				})
-				log.Println("Swap detected and matched!")
-			}
+			// Send the message to the interpreter for swap detection alongside the webhook URL.
+			go s.processWithInterpreter(message)
+			matchedMessages = append(matchedMessages, message)
+			log.Println("Match found for signer!")
 		}
 
 		// Extract the Block.Timestamp field if it exists.
@@ -114,6 +98,21 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 	// Send matched messages to the webhook.
 	s.sendMatchedMessages(matchedMessages)
+}
+
+// processWithInterpreter sends the message to the interpreter for swap detection.
+func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
+	jsonData, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Failed to marshal message for interpreter: %v\n", err)
+		return
+	}
+
+	// Call the interpreter function with the JSON message and webhook URL.
+	err = interpreter.ProcessMessage(jsonData, s.webhookURL)
+	if err != nil {
+		log.Printf("Interpreter processing failed: %v\n", err)
+	}
 }
 
 // getBlockTimestamp safely extracts the Block.Timestamp value from a message.

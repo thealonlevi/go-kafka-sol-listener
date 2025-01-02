@@ -1,9 +1,11 @@
 package interpreter
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 )
 
 type Account struct {
@@ -94,4 +96,40 @@ func DetectSwap(jsonData []byte) (string, error) {
 	}
 
 	return fmt.Sprintf("Swapped: %s %s", received, spent), nil
+}
+
+func ProcessMessage(jsonData []byte, webhookURL string) error {
+	// Detect swap
+	result, err := DetectSwap(jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to detect swap: %w", err)
+	}
+
+	if result == "No swap detected" {
+		return nil
+	}
+
+	// Prepare the payload for the webhook
+	payload := map[string]interface{}{
+		"SwapDetails":     result,
+		"OriginalMessage": json.RawMessage(jsonData),
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	// Send the detected swap to the webhook
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to send to webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
+	}
+
+	return nil
 }
