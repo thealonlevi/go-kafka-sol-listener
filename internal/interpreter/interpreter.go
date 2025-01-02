@@ -4,123 +4,45 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
+	"log"
 	"net/http"
+	"os/exec"
 )
 
-type Account struct {
-	Address    string `json:"Address"`
-	IsSigner   bool   `json:"IsSigner"`
-	IsWritable bool   `json:"IsWritable"`
-	Token      *Token `json:"Token"`
-}
-
-type Token struct {
-	Decimals int    `json:"Decimals"`
-	Mint     string `json:"Mint"`
-	Owner    string `json:"Owner"`
-}
-
-type BalanceUpdate struct {
-	Account     Account `json:"Account"`
-	PostBalance int64   `json:"PostBalance"`
-	PreBalance  int64   `json:"PreBalance"`
-}
-
-type Currency struct {
-	Decimals    int    `json:"Decimals"`
-	MintAddress string `json:"MintAddress"`
-	Name        string `json:"Name"`
-}
-
-type Update struct {
-	BalanceUpdate BalanceUpdate `json:"BalanceUpdate"`
-	Currency      Currency      `json:"Currency"`
-}
-
-type Transaction struct {
-	Signer string `json:"Signer"`
-}
-
-type Input struct {
-	BalanceUpdates []Update    `json:"BalanceUpdates"`
-	Transaction    Transaction `json:"Transaction"`
-}
-
-func DetectSwap(jsonData []byte) (string, error) {
-	var input Input
-	if err := json.Unmarshal(jsonData, &input); err != nil {
-		return "", fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	signer := input.Transaction.Signer
-	filteredUpdates := []Update{}
-
-	for _, update := range input.BalanceUpdates {
-		if (update.BalanceUpdate.Account.Address == signer ||
-			(update.BalanceUpdate.Account.Token != nil && update.BalanceUpdate.Account.Token.Owner == signer)) &&
-			update.BalanceUpdate.PostBalance != update.BalanceUpdate.PreBalance {
-			filteredUpdates = append(filteredUpdates, update)
-		}
-	}
-
-	if len(filteredUpdates) < 2 {
-		return "No swap detected", nil
-	}
-
-	firstUpdate := filteredUpdates[0]
-	lastUpdate := filteredUpdates[len(filteredUpdates)-1]
-
-	firstAmountRaw := firstUpdate.BalanceUpdate.PostBalance - firstUpdate.BalanceUpdate.PreBalance
-	lastAmountRaw := lastUpdate.BalanceUpdate.PostBalance - lastUpdate.BalanceUpdate.PreBalance
-
-	firstAmount := float64(firstAmountRaw) / math.Pow10(firstUpdate.Currency.Decimals)
-	lastAmount := float64(lastAmountRaw) / math.Pow10(lastUpdate.Currency.Decimals)
-
-	token1Name := firstUpdate.Currency.Name
-	if token1Name == "" {
-		token1Name = firstUpdate.Currency.MintAddress
-	}
-	token2Name := lastUpdate.Currency.Name
-	if token2Name == "" {
-		token2Name = lastUpdate.Currency.MintAddress
-	}
-
-	var spent, received string
-	if firstAmount < 0 {
-		spent = fmt.Sprintf("-%.5f %s", math.Abs(firstAmount), token1Name)
-		received = fmt.Sprintf("+%.5f %s", math.Abs(lastAmount), token2Name)
-	} else {
-		spent = fmt.Sprintf("-%.5f %s", math.Abs(lastAmount), token2Name)
-		received = fmt.Sprintf("+%.5f %s", math.Abs(firstAmount), token1Name)
-	}
-
-	return fmt.Sprintf("Swapped: %s %s", received, spent), nil
-}
-
+// ProcessMessage handles the input message, invokes the Python script for swap detection, and sends the results to the webhook.
 func ProcessMessage(jsonData []byte, webhookURL string) error {
-	// Detect swap
-	result, err := DetectSwap(jsonData)
+	// Invoke the Python script for swap detection.
+	result, err := invokePythonScript(jsonData)
 	if err != nil {
-		return fmt.Errorf("failed to detect swap: %w", err)
+		return fmt.Errorf("failed to invoke Python script: %w", err)
 	}
+
+	log.Printf("Python script output: %s", result)
 
 	if result == "No swap detected" {
+		log.Println("No swap detected.")
 		return nil
 	}
 
-	// Prepare the payload for the webhook
+	log.Printf("Swap detected: %s\n", result)
+
+	// Prepare the payload for the webhook.
 	payload := map[string]interface{}{
 		"SwapDetails":     result,
 		"OriginalMessage": json.RawMessage(jsonData),
 	}
 
-	jsonPayload, err := json.Marshal(payload)
+	wrappedPayload := map[string]interface{}{
+		"body": payload,
+	}
+
+	jsonPayload, err := json.Marshal(wrappedPayload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	// Send the detected swap to the webhook
+	// Send the detected swap to the webhook.
+	log.Println(webhookURL)
 	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to send to webhook: %w", err)
@@ -132,4 +54,26 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	}
 
 	return nil
+}
+
+// invokePythonScript executes the Python script and returns the result of the swap detection.
+func invokePythonScript(jsonData []byte) (string, error) {
+	// Prepare the command to execute the Python script.
+	cmd := exec.Command("python3", "scripts/swapdetector.py")
+
+	// Provide the JSON data as input to the script.
+	cmd.Stdin = bytes.NewBuffer(jsonData)
+
+	// Capture the script's output.
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+
+	// Run the command.
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to execute Python script: %v\nOutput: %s", err, output.String())
+	}
+
+	// Return the script's output as a string.
+	return output.String(), nil
 }
