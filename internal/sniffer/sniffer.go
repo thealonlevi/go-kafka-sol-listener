@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"go-kafka-sol-listener/internal/interpreter"
 	"go-kafka-sol-listener/internal/wallet"
 )
 
@@ -45,7 +46,7 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	// Record the start timestamp.
 	timestampStart := time.Now().UnixMilli()
 
-	// matchedMessages stores messages that match the wallet list.
+	// matchedMessages stores messages that match the wallet list and detect swaps.
 	matchedMessages := []map[string]interface{}{}
 
 	// Prepare a list to store timestamps from the Block field.
@@ -69,8 +70,26 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 		// Check if the signer exists in the wallet list.
 		if s.walletManager.WalletExists(signer) {
-			matchedMessages = append(matchedMessages, message)
-			log.Println("Match found for signer!")
+			// Pass the message to the interpreter for swap detection.
+			jsonData, err := json.Marshal(message)
+			if err != nil {
+				log.Printf("Failed to marshal message for interpretation: %v\n", err)
+				continue
+			}
+
+			result, err := interpreter.DetectSwap(jsonData)
+			if err != nil {
+				log.Printf("Failed to detect swap: %v\n", err)
+				continue
+			}
+
+			if result != "No swap detected" {
+				matchedMessages = append(matchedMessages, map[string]interface{}{
+					"Message":     message,
+					"SwapDetails": result,
+				})
+				log.Println("Swap detected and matched!")
+			}
 		}
 
 		// Extract the Block.Timestamp field if it exists.
