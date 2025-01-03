@@ -49,7 +49,7 @@ func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
 
 	// Consume messages and offload to sniffer every 1000ms.
 	fmt.Println("Consumer is now listening for messages...")
-	ticker := time.NewTicker(1000 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	var batchedMessages []map[string]interface{}
