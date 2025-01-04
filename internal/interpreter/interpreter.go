@@ -67,21 +67,18 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	// Log the enriched details for debugging.
 	logEnrichedDetails(details)
 
-	// Prepare the payload for the webhook.
-	wrappedPayload := map[string]interface{}{
-		"body": details,
-	}
-
-	jsonPayload, err := json.MarshalIndent(wrappedPayload, "", "  ")
+	// Marshal enriched details as the body of the request.
+	jsonPayload, err := json.MarshalIndent(details, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		log.Printf("Failed to marshal enriched details: %v\n", err)
+		return fmt.Errorf("failed to marshal enriched details: %w", err)
 	}
 
-	// Send the detected swap to the webhook.
-	log.Println(webhookURL)
+	// Send the enriched details to the webhook.
+	log.Printf("Sending enriched details to webhook: %s\n", webhookURL)
 	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		return fmt.Errorf("failed to send to webhook: %w", err)
+		return fmt.Errorf("failed to send enriched details to webhook: %w", err)
 	}
 	defer resp.Body.Close()
 
