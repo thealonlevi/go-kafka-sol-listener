@@ -26,8 +26,8 @@ type Sniffer struct {
 // NewSniffer initializes a new Sniffer with a wallet manager and a webhook URL.
 func NewSniffer(walletManager *wallet.WalletManager, webhookURL string) *Sniffer {
 	return &Sniffer{
-		walletManager: walletManager,
-		webhookURL:    webhookURL,
+		walletManager: walletManager, // Initialize with the wallet manager for wallet checks.
+		webhookURL:    webhookURL,    // Set the webhook URL for sending matched messages.
 	}
 }
 
@@ -38,12 +38,12 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		tsI, okI := getBlockTimestamp(messages[i])
 		tsJ, okJ := getBlockTimestamp(messages[j])
 		if okI && okJ {
-			return tsI < tsJ
+			return tsI < tsJ // Ensure messages are sorted chronologically.
 		}
-		return false
+		return false // Default to keeping order if timestamps are invalid.
 	})
 
-	// Record the start timestamp.
+	// Record the start timestamp to measure processing latency.
 	timestampStart := time.Now().UnixMilli()
 
 	// matchedMessages stores messages that match the wallet list and detect swaps.
@@ -58,43 +58,41 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		transaction, ok := message["Transaction"].(map[string]interface{})
 		if !ok {
 			log.Println("Transaction field missing or invalid")
-			continue
+			continue // Skip messages without a valid Transaction field.
 		}
 
 		// Extract the signer field from the transaction.
 		signer, ok := transaction["Signer"].(string)
 		if !ok {
 			log.Println("Signer field missing or invalid")
-			continue
+			continue // Skip messages without a valid Signer field.
 		}
 
 		// Check if the signer exists in the wallet list.
 		if s.walletManager.WalletExists(signer) {
 			// Send the message to the interpreter for swap detection alongside the webhook URL.
-			go s.processWithInterpreter(message)
-			matchedMessages = append(matchedMessages, message)
+			go s.processWithInterpreter(message)               // Process each matching message concurrently.
+			matchedMessages = append(matchedMessages, message) // Collect matched messages.
 			log.Println("Match found for signer!")
 		}
 
 		// Extract the Block.Timestamp field if it exists.
 		if blockTimestamp, ok := getBlockTimestamp(message); ok {
-			blockTimestamps = append(blockTimestamps, blockTimestamp)
+			blockTimestamps = append(blockTimestamps, blockTimestamp) // Collect timestamps.
 		}
 	}
 
 	// Determine the key timestamps from the batch.
-	var timestamp1, timestampMiddle, timestampLast int64
+	var timestamp1 int64
 	if len(blockTimestamps) > 0 {
-		timestamp1 = blockTimestamps[0]
-		timestampLast = blockTimestamps[len(blockTimestamps)-1]
-		timestampMiddle = blockTimestamps[len(blockTimestamps)/2]
+		timestamp1 = blockTimestamps[0] // Use the first timestamp in the batch for latency calculations.
 	}
 
-	// Record the end timestamp.
+	// Record the end timestamp to measure processing latency.
 	timestampEnd := time.Now().UnixMilli()
 
 	// Calculate and log metrics.
-	s.logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast)
+	s.logMetrics(timestampStart, timestampEnd, timestamp1)
 
 	// Send matched messages to the webhook.
 	s.sendMatchedMessages(matchedMessages)
@@ -102,10 +100,11 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 // processWithInterpreter sends the message to the interpreter for swap detection.
 func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
+	// Convert the message to JSON format.
 	jsonData, err := json.Marshal(message)
 	if err != nil {
 		log.Printf("Failed to marshal message for interpreter: %v\n", err)
-		return
+		return // Skip processing if marshaling fails.
 	}
 
 	// Call the interpreter function with the JSON message and webhook URL.
@@ -119,13 +118,13 @@ func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
 func getBlockTimestamp(message map[string]interface{}) (int64, bool) {
 	block, ok := message["Block"].(map[string]interface{})
 	if !ok {
-		return 0, false
+		return 0, false // Return false if Block field is missing or invalid.
 	}
 	timestamp, ok := block["Timestamp"].(float64)
 	if !ok {
-		return 0, false
+		return 0, false // Return false if Timestamp is missing or invalid.
 	}
-	return int64(timestamp * 1000), true // Convert seconds to milliseconds
+	return int64(timestamp), true // Convert timestamp to int64 and return it.
 }
 
 // sendMatchedMessages sends matched messages to the webhook URL.
@@ -139,14 +138,14 @@ func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 		jsonData, err := json.Marshal(message)
 		if err != nil {
 			log.Printf("Failed to marshal message: %v\n", err)
-			continue
+			continue // Skip messages that fail to marshal.
 		}
 
 		// Send the JSON data to the webhook.
 		resp, err := http.Post(s.webhookURL, "application/json", bytes.NewBuffer(jsonData))
 		if err != nil {
 			log.Printf("Failed to send message to webhook: %v\n", err)
-			continue
+			continue // Skip messages that fail to send.
 		}
 		defer resp.Body.Close()
 
@@ -158,17 +157,11 @@ func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 }
 
 // logMetrics calculates and logs the latency metrics.
-func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1, timestampMiddle, timestampLast int64) {
-	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart)
+func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1 int64) {
+	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart) // Log the time taken to process messages.
 	if timestamp1 > 0 {
-		log.Printf("Batch Latency: %d ms\n", timestampLast-timestamp1)
-		log.Printf("ConsumerLatency1: %d ms\n", timestampStart-timestamp1)
-		log.Printf("ConsumerLatency2: %d ms\n", timestampStart-timestampMiddle)
-		log.Printf("ConsumerLatency3: %d ms\n", timestampStart-timestampLast)
-		log.Printf("Kafka Server Latency: %d ms\n", (timestampEnd-timestamp1)-(timestampLast-timestamp1))
-		log.Printf("Total Latency: %d ms\n", timestampEnd-timestamp1)
-		log.Printf("Timestamp1: %d ms\n", timestamp1)
-		log.Printf("TimestampLast: %d ms\n", timestampLast)
+		log.Printf("Kafka Server Latency: %d seconds\n", (timestampEnd-timestamp1)/1000) // Log the Kafka server latency in seconds.
+		log.Printf("Total Latency: %d seconds\n", (timestampEnd-timestamp1)/1000)        // Log the total latency in seconds.
 	} else {
 		log.Println("No valid timestamps found in the batch for latency calculations.")
 	}

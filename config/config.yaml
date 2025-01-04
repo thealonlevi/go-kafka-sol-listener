@@ -15,3 +15,9 @@ kafka:
     ssl_certificate_location: "env/client.cer.pem"
     endpoint_identification_algorithm: "none"
   auto_offset_reset: "latest"
+  poll_interval_ms: 1000
+
+application:
+  webhook_url: "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/transactionWebhook"
+  wallet_list_url: "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/getWalletList"
+  wallet_update_interval_ms: 60000

@@ -9,7 +9,7 @@ Go-Kafka-Sol-Listener is a high-performance application designed to process Sola
 ## Features
 
 1. **Kafka Consumer:**
-   - Subscribes to a Kafka topic and processes batches of messages.
+   - Subscribes to a Kafka topic and processes messages at configurable polling intervals.
 
 2. **Wallet Matching:**
    - Matches transactions based on a dynamic list of wallet addresses fetched from an external API.
@@ -17,8 +17,7 @@ Go-Kafka-Sol-Listener is a high-performance application designed to process Sola
 3. **Sniffer Metrics:**
    - Calculates latency metrics including:
      - Sniffer Latency
-     - Batch Latency
-     - Consumer Latency (1, 2, 3)
+     - Kafka Server Latency
      - Total Latency
 
 4. **Webhook Integration:**
@@ -26,6 +25,9 @@ Go-Kafka-Sol-Listener is a high-performance application designed to process Sola
 
 5. **Message Sorting:**
    - Ensures all incoming messages are sorted by block timestamp for consistent processing.
+
+6. **Configuration-Driven:**
+   - Key parameters like webhook URL, wallet API, and Kafka settings are managed via a `config.yaml` file.
 
 ---
 
@@ -47,11 +49,15 @@ go-kafka-sol-listener/
 │   ├── consumer/
 │   │   └── consumer.go       # Kafka consumer logic
 │   ├── sniffer/
-│   │   └── sniffer.go        # Sniffing and processing Solana transactions
-│   └── wallet/
-│       └── wallet.go         # Wallet management logic
-├── test/
-│   └── test.go         # Test script for local debugging
+│   │   ├── sniffer.go        # Sniffing and processing Solana transactions
+│   │   └── README.md         # Detailed documentation for Sniffer
+│   ├── wallet/
+│   │   └── wallet.go         # Wallet management logic
+│   └── interpreter/
+│       ├── interpreter.go    # Message interpretation logic
+│       └── README.md         # Documentation for Interpreter module
+├── scripts/
+│   └── swapdetector.py  # Python utility for advanced swap detection
 ├── .gitignore           # Git ignore file
 ├── go.mod               # Go module dependencies
 ├── go.sum               # Dependency checksums
@@ -118,9 +124,17 @@ kafka:
     ssl_certificate_location: ""
     endpoint_identification_algorithm: ""
   auto_offset_reset: "earliest"
+  poll_interval_ms: 1000
 
 webhook_url: "https://example.com/webhook"
+wallethandler_url: "https://example.com/getWalletList"
+wallethandler_update_interval: 60000
 ```
+
+- `poll_interval_ms`: Configures the polling interval for Kafka consumer.
+- `webhook_url`: Defines the webhook endpoint to send matched transactions.
+- `wallethandler_url`: URL to fetch the dynamic wallet list.
+- `wallethandler_update_interval`: Interval in milliseconds to update the wallet list.
 
 ---
 
@@ -160,19 +174,15 @@ $ tmux attach-session -t kafka-listener
 ## Metrics Calculated
 
 ### Latency Metrics
-- **Sniffer Latency:** Time taken by the sniffer to process a batch.
-- **Batch Latency:** Difference between the timestamps of the first and last message in the batch.
-- **Consumer Latency:** Measures the delay in processing messages at three points (start, middle, end).
-- **Total Latency:** End-to-end latency for the batch.
+- **Sniffer Latency:** Time taken by the sniffer to process messages.
+- **Kafka Server Latency:** Measures the delay between Kafka's internal timestamps and processing.
+- **Total Latency:** End-to-end latency for message processing.
 
 ### Example Output:
 ```plaintext
-Sniffer Latency: 3 seconds
-Batch Latency: 10 seconds
-ConsumerLatency1: 5 seconds
-ConsumerLatency2: 6 seconds
-ConsumerLatency3: 8 seconds
-Total Latency: 11 seconds
+Sniffer Latency: 300 ms
+Kafka Server Latency: 2 seconds
+Total Latency: 2.3 seconds
 ```
 
 ---

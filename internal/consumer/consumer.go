@@ -6,94 +6,87 @@ import (
 	"go-kafka-sol-listener/internal/config"
 	"go-kafka-sol-listener/internal/sniffer"
 	"log"
-	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 // StartConsumer initializes the Kafka consumer and processes messages.
+// It takes in the application configuration and the sniffer instance for processing messages.
 func StartConsumer(cfg *config.Config, sniffer *sniffer.Sniffer) error {
-	// Join bootstrap servers into a single string.
+	// Step 1: Construct the Kafka bootstrap servers string from the configuration.
 	bootstrapServers := ""
 	for i, server := range cfg.Kafka.BootstrapServers {
 		bootstrapServers += server
 		if i < len(cfg.Kafka.BootstrapServers)-1 {
-			bootstrapServers += ","
+			bootstrapServers += "," // Add a comma separator between servers.
 		}
 	}
 
-	// Create Kafka consumer.
+	// Step 2: Create the Kafka consumer using the configuration provided.
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":                     bootstrapServers,
-		"group.id":                              cfg.Kafka.GroupID,
-		"security.protocol":                     cfg.Kafka.Security.Protocol,
-		"sasl.mechanisms":                       cfg.Kafka.Security.SASLMechanisms,
-		"sasl.username":                         cfg.Kafka.Security.Username,
-		"sasl.password":                         cfg.Kafka.Security.Password,
-		"ssl.ca.location":                       cfg.Kafka.Security.SSLCALocation,
-		"ssl.key.location":                      cfg.Kafka.Security.SSLKeyLocation,
-		"ssl.certificate.location":              cfg.Kafka.Security.SSLCertificateLocation,
-		"ssl.endpoint.identification.algorithm": cfg.Kafka.Security.EndpointIdentificationAlgorithm,
-		"auto.offset.reset":                     cfg.Kafka.AutoOffsetReset,
+		"bootstrap.servers":                     bootstrapServers,                                   // List of Kafka brokers.
+		"group.id":                              cfg.Kafka.GroupID,                                  // Consumer group ID.
+		"security.protocol":                     cfg.Kafka.Security.Protocol,                        // Security protocol.
+		"sasl.mechanisms":                       cfg.Kafka.Security.SASLMechanisms,                  // SASL authentication mechanism.
+		"sasl.username":                         cfg.Kafka.Security.Username,                        // SASL username.
+		"sasl.password":                         cfg.Kafka.Security.Password,                        // SASL password.
+		"ssl.ca.location":                       cfg.Kafka.Security.SSLCALocation,                   // Path to CA certificate.
+		"ssl.key.location":                      cfg.Kafka.Security.SSLKeyLocation,                  // Path to SSL key.
+		"ssl.certificate.location":              cfg.Kafka.Security.SSLCertificateLocation,          // Path to SSL certificate.
+		"ssl.endpoint.identification.algorithm": cfg.Kafka.Security.EndpointIdentificationAlgorithm, // Endpoint verification.
+		"auto.offset.reset":                     cfg.Kafka.AutoOffsetReset,                          // Where to start reading messages.
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create Kafka consumer: %w", err)
+		return fmt.Errorf("failed to create Kafka consumer: %w", err) // Handle consumer creation failure.
 	}
-	defer consumer.Close()
+	defer consumer.Close() // Ensure the consumer is closed when the function exits.
 
-	// Subscribe to Kafka topic.
+	// Step 3: Subscribe to the Kafka topic specified in the configuration.
 	err = consumer.SubscribeTopics([]string{cfg.Kafka.Topic}, nil)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to topic: %w", err)
+		return fmt.Errorf("failed to subscribe to topic: %w", err) // Handle subscription failure.
 	}
 
-	// Consume messages and offload to sniffer every 1000ms.
+	// Step 4: Determine the polling interval from configuration (in milliseconds).
+	pollInterval := 1000 // Default value is 1000ms if not configured.
+	if cfg.Kafka.PollIntervalMs > 0 {
+		pollInterval = cfg.Kafka.PollIntervalMs // Use configured value if available.
+	}
+
 	fmt.Println("Consumer is now listening for messages...")
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
 
-	var batchedMessages []map[string]interface{}
-
-	// Goroutine to periodically process messages.
-	go func() {
-		for range ticker.C {
-			if len(batchedMessages) > 0 {
-				messagesToProcess := batchedMessages
-				batchedMessages = nil // Reset the batch.
-				go sniffer.HandleMessages(messagesToProcess)
-			}
-		}
-	}()
-
-	// Main loop to poll Kafka messages.
+	// Step 5: Main loop to continuously poll for Kafka messages.
 	for {
-		ev := consumer.Poll(100)
+		ev := consumer.Poll(pollInterval) // Poll for messages/events from Kafka.
 		if ev == nil {
-			continue
+			continue // If no event, continue to the next poll cycle.
 		}
 
 		switch e := ev.(type) {
-		case *kafka.Message:
-			if err := handleKafkaMessage(e, &batchedMessages); err != nil {
-				log.Printf("Failed to handle Kafka message: %v", err)
+		case *kafka.Message: // Handle Kafka message event.
+			if err := handleKafkaMessage(e, sniffer); err != nil {
+				log.Printf("Failed to handle Kafka message: %v", err) // Log any message handling errors.
 			}
-		case kafka.Error:
+		case kafka.Error: // Handle Kafka error event.
 			log.Printf("Kafka error: %v", e)
 			if e.IsFatal() {
-				return fmt.Errorf("fatal Kafka error: %w", e)
+				return fmt.Errorf("fatal Kafka error: %w", e) // Exit on fatal errors.
 			}
-		default:
+		default: // Handle any other events.
 			log.Printf("Ignored event: %v", e)
 		}
 	}
 }
 
-// handleKafkaMessage processes a Kafka message and appends it to the batch.
-func handleKafkaMessage(msg *kafka.Message, batch *[]map[string]interface{}) error {
+// handleKafkaMessage processes a single Kafka message and sends it to the sniffer for processing.
+func handleKafkaMessage(msg *kafka.Message, sniffer *sniffer.Sniffer) error {
+	// Step 1: Parse the message value into a slice of maps.
 	var messages []map[string]interface{}
 	if err := json.Unmarshal(msg.Value, &messages); err != nil {
-		return fmt.Errorf("unmarshal failed: %w", err)
+		return fmt.Errorf("unmarshal failed: %w", err) // Handle JSON parsing errors.
 	}
-	*batch = append(*batch, messages...)
-	return nil
+
+	// Step 2: Pass the parsed messages to the sniffer for further processing.
+	sniffer.HandleMessages(messages)
+	return nil // Indicate successful handling of the message.
 }

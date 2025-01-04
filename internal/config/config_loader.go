@@ -24,7 +24,13 @@ type Config struct {
 			EndpointIdentificationAlgorithm string `yaml:"endpoint_identification_algorithm"`
 		} `yaml:"security"`
 		AutoOffsetReset string `yaml:"auto_offset_reset"`
+		PollIntervalMs  int    `yaml:"poll_interval_ms"`
 	} `yaml:"kafka"`
+	Application struct {
+		WebhookURL             string `yaml:"webhook_url"`
+		WalletListURL          string `yaml:"wallet_list_url"`
+		WalletUpdateIntervalMs int    `yaml:"wallet_update_interval_ms"`
+	} `yaml:"application"`
 }
 
 // LoadConfig loads the configuration from the specified YAML file.

@@ -19,7 +19,7 @@ func main() {
 	fmt.Printf("Loaded configuration: %+v\n", cfg)
 
 	// Initialize WalletManager
-	walletManager := wallet.NewWalletManager("https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/getWalletList")
+	walletManager := wallet.NewWalletManager(cfg.Application.WalletListURL)
 
 	// Start WalletManager update loop
 	go walletManager.UpdateWallets()
@@ -29,20 +29,20 @@ func main() {
 		for {
 			wallets := walletManager.GetWalletList()
 			log.Printf("Current wallet list: %v\n", wallets)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(time.Duration(cfg.Application.WalletUpdateIntervalMs) * time.Millisecond)
 		}
 	}()
 
 	// Initialize Sniffer with webhook URL
-	snifferInstance := sniffer.NewSniffer(walletManager, "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/transactionWebhook")
+	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL)
 
 	// Restart logic for the Kafka consumer
 	for {
 		fmt.Println("Starting Kafka consumer...")
-		err := consumer.StartConsumer(cfg, snifferInstance) // Updated to return an error
+		err := consumer.StartConsumer(cfg, snifferInstance)
 		if err != nil {
 			log.Printf("Kafka consumer encountered an error: %v. Restarting in 5 seconds...", err)
-			time.Sleep(5 * time.Second) // Wait before restarting
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
