@@ -160,8 +160,9 @@ func (s *Sniffer) sendMatchedMessages(messages []map[string]interface{}) {
 func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1 int64) {
 	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart) // Log the time taken to process messages.
 	if timestamp1 > 0 {
-		log.Printf("Kafka Server Latency: %d seconds\n", (timestampEnd-timestamp1)/1000) // Log the Kafka server latency in seconds.
-		log.Printf("Total Latency: %d seconds\n", (timestampEnd-timestamp1)/1000)        // Log the total latency in seconds.
+
+		log.Printf("Kafka Server Latency: %d seconds\n", (timestampStart/1000)-timestamp1) // Log the Kafka server latency in seconds.
+		log.Printf("Total Latency: %d seconds\n", (timestampEnd/1000)-timestamp1)          // Log the total latency in seconds.
 	} else {
 		log.Println("No valid timestamps found in the batch for latency calculations.")
 	}
