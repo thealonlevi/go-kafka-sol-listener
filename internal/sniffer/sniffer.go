@@ -41,6 +41,9 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 	// Record the start timestamp to measure processing latency.
 	timestampStart := time.Now().UnixMilli()
 
+	// Prepare a list to store timestamps from the Block field.
+	var blockTimestamps []int64
+
 	// Iterate through the messages to process them.
 	for _, message := range messages {
 		// Extract the transaction field from the message.
@@ -62,13 +65,24 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			log.Println("Match found for signer! Forwarding to interpreter.")
 			go s.processWithInterpreter(message) // Forward the message to the interpreter.
 		}
+
+		// Extract the Block.Timestamp field if it exists.
+		if blockTimestamp, ok := getBlockTimestamp(message); ok {
+			blockTimestamps = append(blockTimestamps, blockTimestamp)
+		}
+	}
+
+	// Determine the key timestamps from the batch.
+	var timestamp1 int64
+	if len(blockTimestamps) > 0 {
+		timestamp1 = blockTimestamps[0] // Use the first timestamp in the batch for latency calculations.
 	}
 
 	// Record the end timestamp to measure processing latency.
 	timestampEnd := time.Now().UnixMilli()
 
-	// Log latency metrics.
-	s.logMetrics(timestampStart, timestampEnd)
+	// Calculate and log metrics.
+	s.logMetrics(timestampStart, timestampEnd, timestamp1)
 }
 
 // processWithInterpreter forwards the message to the interpreter for swap detection.
@@ -101,6 +115,12 @@ func getBlockTimestamp(message map[string]interface{}) (int64, bool) {
 }
 
 // logMetrics calculates and logs the latency metrics.
-func (s *Sniffer) logMetrics(timestampStart, timestampEnd int64) {
-	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart)
+func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1 int64) {
+	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart) // Log the time taken to process messages.
+	if timestamp1 > 0 {
+		log.Printf("Kafka Server Latency: %d seconds\n", (timestampStart/1000)-timestamp1) // Log the Kafka server latency in seconds.
+		log.Printf("Total Latency: %d seconds\n", (timestampEnd/1000)-timestamp1)          // Log the total latency in seconds.
+	} else {
+		log.Println("No valid timestamps found in the batch for latency calculations.")
+	}
 }
