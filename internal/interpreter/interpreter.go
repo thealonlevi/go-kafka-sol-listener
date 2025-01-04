@@ -68,7 +68,7 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	logEnrichedDetails(details)
 
 	// Marshal enriched details as the body of the request.
-	jsonPayload, err := json.MarshalIndent(details, "", "  ")
+	jsonPayload, err := json.MarshalIndent(map[string]interface{}{"body": details}, "", "  ")
 	if err != nil {
 		log.Printf("Failed to marshal enriched details: %v\n", err)
 		return fmt.Errorf("failed to marshal enriched details: %w", err)
