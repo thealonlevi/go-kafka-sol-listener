@@ -2,7 +2,7 @@ import json
 import sys
 
 def detect_swap(balance_updates, signer_address):
-    # Your detection logic here
+    # Filter updates for the provided signer address and detect swaps
     filtered_updates = [
         update for update in balance_updates
         if (
@@ -22,6 +22,7 @@ def detect_swap(balance_updates, signer_address):
     first_update = filtered_updates[0]
     last_update = filtered_updates[-1]
 
+    # Extract values from BalanceUpdate for Token1 and Token2
     first_amount_raw = first_update["BalanceUpdate"]["PostBalance"] - first_update["BalanceUpdate"]["PreBalance"]
     last_amount_raw = last_update["BalanceUpdate"]["PostBalance"] - last_update["BalanceUpdate"]["PreBalance"]
 
@@ -32,18 +33,46 @@ def detect_swap(balance_updates, signer_address):
     last_amount = last_amount_raw / (10 ** last_decimals)
 
     token1_mint = first_update["Currency"].get("MintAddress")
-    token1_name = first_update["Currency"].get("Name", "null")
+    token1_symbol = first_update["Currency"].get("Symbol", "null")
     token2_mint = last_update["Currency"].get("MintAddress")
-    token2_name = last_update["Currency"].get("Name", "null")
+    token2_symbol = last_update["Currency"].get("Symbol", "null")
 
-    if first_amount < 0:
-        spent = f"-{abs(first_amount):.5f} {token1_name or token1_mint}"
-        received = f"+{abs(last_amount):.5f} {token2_name or token2_mint}"
-    else:
-        spent = f"-{abs(last_amount):.5f} {token2_name or token2_mint}"
-        received = f"+{abs(first_amount):.5f} {token1_name or token1_mint}"
+    # Extract post-swap balance for Token2
+    token2_post_swap_balance = last_update["BalanceUpdate"]["PostBalance"] / (10 ** last_decimals)
 
-    return {"swapDetected": True, "details": f"Swapped: {received} {spent}"}
+    # Extract transaction details
+    transaction_fee = data.get("Transaction", {}).get("Fee", 0) / (10 ** 9)  # Convert from lamports to SOL
+    timestamp = data.get("Block", {}).get("Timestamp", 0)
+    signature = data.get("Transaction", {}).get("Signature", "")
+
+    # Build the resulting JSON structure
+    result = {
+        "TransactionDetails": {
+            "Signer": signer_address,
+            "Signature": signature,
+            "Timestamp": timestamp
+        },
+        "Token1": {
+            "Symbol": token1_symbol,
+            "Mint": token1_mint,
+            "Amount": abs(first_amount),
+            "AmountUSD": None  # Placeholder for USD conversion
+        },
+        "Token2": {
+            "Symbol": token2_symbol,
+            "Mint": token2_mint,
+            "Amount": abs(last_amount),
+            "AmountUSD": None,  # Placeholder for USD conversion
+            "PostSwapBalance": token2_post_swap_balance,
+            "PostSwapBalanceUSD": None  # Placeholder for USD conversion
+        },
+        "Fee": {
+            "Amount": transaction_fee,
+            "AmountUSD": None  # Placeholder for USD conversion
+        }
+    }
+
+    return {"swapDetected": True, "details": result}
 
 
 if __name__ == "__main__":
@@ -56,6 +85,6 @@ if __name__ == "__main__":
             raise ValueError("Signer address is required")
 
         result = detect_swap(balance_updates, signer)
-        print(json.dumps(result))
+        print(json.dumps(result, indent=2))
     except Exception as e:
         print(json.dumps({"error": str(e)}))

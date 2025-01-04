@@ -1,14 +1,49 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"go-kafka-sol-listener/internal/config"
 	"go-kafka-sol-listener/internal/consumer"
+	"go-kafka-sol-listener/internal/interpreter" // Import interpreter to update cache
 	"go-kafka-sol-listener/internal/sniffer"
 	"go-kafka-sol-listener/internal/wallet"
 	"log"
+	"math/rand"
+	"net/http"
 	"time"
 )
+
+// fetchSolToUsdRate fetches the current SOL-to-USD rate and updates the interpreter cache.
+func fetchSolToUsdRate() {
+	for {
+		interval := time.Duration(rand.Intn(481)+120) * time.Second // Random interval between 120-600s
+		time.Sleep(interval)
+
+		log.Println("Fetching SOL-to-USD exchange rate...")
+		response, err := http.Get("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
+		if err != nil {
+			log.Printf("Failed to fetch SOL-to-USD rate: %v\n", err)
+			continue
+		}
+		defer response.Body.Close()
+
+		var responseData map[string]map[string]float64
+		if err := json.NewDecoder(response.Body).Decode(&responseData); err != nil {
+			log.Printf("Failed to decode SOL-to-USD response: %v\n", err)
+			continue
+		}
+
+		rate, ok := responseData["solana"]["usd"]
+		if !ok {
+			log.Println("SOL-to-USD rate not found in response")
+			continue
+		}
+
+		interpreter.SetSolToUsdCache(rate) // Update the interpreter cache
+		log.Printf("Updated SOL-to-USD rate in interpreter: %f\n", rate)
+	}
+}
 
 func main() {
 	// Load configuration
@@ -29,12 +64,15 @@ func main() {
 		for {
 			wallets := walletManager.GetWalletList()
 			log.Printf("Current wallet list: %v\n", wallets)
-			time.Sleep(time.Duration(cfg.Application.WalletUpdateIntervalMs) * time.Millisecond)
+			time.Sleep(1 * time.Minute)
 		}
 	}()
 
 	// Initialize Sniffer with webhook URL
 	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL)
+
+	// Start the SOL-to-USD rate fetcher
+	go fetchSolToUsdRate()
 
 	// Restart logic for the Kafka consumer
 	for {
