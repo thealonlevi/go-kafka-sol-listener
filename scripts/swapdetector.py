@@ -22,28 +22,39 @@ def detect_swap(balance_updates, signer_address):
     first_update = filtered_updates[0]
     last_update = filtered_updates[-1]
 
-    # Extract values from BalanceUpdate for Token1 and Token2
+    # Extract raw balance changes for Token1 and Token2
     first_amount_raw = first_update["BalanceUpdate"]["PostBalance"] - first_update["BalanceUpdate"]["PreBalance"]
     last_amount_raw = last_update["BalanceUpdate"]["PostBalance"] - last_update["BalanceUpdate"]["PreBalance"]
 
+    # Extract decimals for proper conversion
     first_decimals = first_update["Currency"].get("Decimals", 0)
     last_decimals = last_update["Currency"].get("Decimals", 0)
 
+    # Calculate the amounts using decimals
     first_amount = first_amount_raw / (10 ** first_decimals)
     last_amount = last_amount_raw / (10 ** last_decimals)
 
+    # Extract token details for Token1 and Token2
     token1_mint = first_update["Currency"].get("MintAddress")
     token1_symbol = first_update["Currency"].get("Symbol", "null")
     token2_mint = last_update["Currency"].get("MintAddress")
     token2_symbol = last_update["Currency"].get("Symbol", "null")
 
-    # Extract post-swap balance for Token2
+    # Extract post-swap balances
+    token1_post_swap_balance = first_update["BalanceUpdate"]["PostBalance"] / (10 ** first_decimals)
     token2_post_swap_balance = last_update["BalanceUpdate"]["PostBalance"] / (10 ** last_decimals)
 
     # Extract transaction details
-    transaction_fee = data.get("Transaction", {}).get("Fee", 0) / (10 ** 9)  # Convert from lamports to SOL
+    transaction_fee = data.get("Transaction", {}).get("Fee", 0) / (10 ** 9)  # Convert lamports to SOL
     timestamp = data.get("Block", {}).get("Timestamp", 0)
     signature = data.get("Transaction", {}).get("Signature", "")
+
+    # Check if SOL is involved and add SOL-specific fields
+    def add_sol_fields(symbol, amount, decimals):
+        return {
+            "AmountSOL": amount if symbol == "SOL" else None,
+            "PostSwapBalanceSOL": token1_post_swap_balance if symbol == "SOL" else None
+        }
 
     # Build the resulting JSON structure
     result = {
@@ -56,7 +67,10 @@ def detect_swap(balance_updates, signer_address):
             "Symbol": token1_symbol,
             "Mint": token1_mint,
             "Amount": abs(first_amount),
-            "AmountUSD": None  # Placeholder for USD conversion
+            "AmountUSD": None,  # Placeholder for USD conversion
+            "PostSwapBalance": token1_post_swap_balance,
+            "PostSwapBalanceUSD": None,  # Placeholder for USD conversion,
+            **add_sol_fields(token1_symbol, abs(first_amount), first_decimals)
         },
         "Token2": {
             "Symbol": token2_symbol,
@@ -64,7 +78,8 @@ def detect_swap(balance_updates, signer_address):
             "Amount": abs(last_amount),
             "AmountUSD": None,  # Placeholder for USD conversion
             "PostSwapBalance": token2_post_swap_balance,
-            "PostSwapBalanceUSD": None  # Placeholder for USD conversion
+            "PostSwapBalanceUSD": None,  # Placeholder for USD conversion,
+            **add_sol_fields(token2_symbol, abs(last_amount), last_decimals)
         },
         "Fee": {
             "Amount": transaction_fee,
