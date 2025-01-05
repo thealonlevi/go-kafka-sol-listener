@@ -109,7 +109,7 @@ func ensureTokenOrder(details map[string]interface{}) map[string]interface{} {
 	return details
 }
 
-// enrichSwapDetails calculates missing USD values and enriches the swap details.
+// enrichSwapDetails calculates missing USD and SOL values and enriches the swap details.
 func enrichSwapDetails(details map[string]interface{}) {
 	rate, err := getCachedSolToUsdRate()
 	if err != nil {
@@ -117,54 +117,43 @@ func enrichSwapDetails(details map[string]interface{}) {
 		return
 	}
 
-	token1, _ := details["Token1"].(map[string]interface{})
-	token2, _ := details["Token2"].(map[string]interface{})
-
-	if token1 == nil || token2 == nil {
-		return
-	}
-
-	// Enrich Token1
-	if amountChange, ok := token1["AmountChange"].(float64); ok {
-		token1["AmountSOL"] = amountChange
-		token1["AmountUSD"] = amountChange * rate
-	}
-	if postBalance, ok := token1["PostSwapBalance"].(float64); ok {
-		token1["PostSwapBalanceSOL"] = postBalance
-		token1["PostSwapBalanceUSD"] = postBalance * rate
-	}
-	if preBalance, ok := token1["PreSwapBalance"].(float64); ok {
-		token1["PreSwapBalanceSOL"] = preBalance
-		token1["PreSwapBalanceUSD"] = preBalance * rate
-	}
-
-	// Calculate SOL to Token2 ratio
-	ratio := 0.0
-	if token1Change, ok := token1["AmountChange"].(float64); ok && token1Change != 0 {
-		if token2Change, ok := token2["AmountChange"].(float64); ok {
-			ratio = -token1Change / token2Change
+	// Token1 enrichment
+	if token1, ok := details["Token1"].(map[string]interface{}); ok {
+		if amount, ok := token1["Amount"].(float64); ok {
+			token1["AmountUSD"] = amount * rate
 		}
 	}
 
-	// Enrich Token2
-	if amountChange, ok := token2["AmountChange"].(float64); ok {
-		token2["AmountSOL"] = amountChange * ratio
-		token2["AmountUSD"] = (amountChange * ratio) * rate
-	}
-	if postBalance, ok := token2["PostSwapBalance"].(float64); ok {
-		token2["PostSwapBalanceSOL"] = postBalance * ratio
-		token2["PostSwapBalanceUSD"] = (postBalance * ratio) * rate
-		if token2["PostSwapBalanceUSD"].(float64) < 0.01 {
-			token2["PostSwapBalanceUSD"] = 0.0
-			token2["PostSwapBalanceSOL"] = 0.0
+	// Token2 enrichment
+	if token2, ok := details["Token2"].(map[string]interface{}); ok {
+		if amount, ok := token2["Amount"].(float64); ok && amount > 0 {
+			if token1, ok := details["Token1"].(map[string]interface{}); ok {
+				if token1Amount, ok := token1["Amount"].(float64); ok && token1Amount > 0 {
+					// Calculate SOL/TOKEN ratio
+					solPerToken := token1Amount / amount
+
+					// Calculate USD/TOKEN ratio
+					usdPerToken := solPerToken * rate
+
+					// Enrich Token2 fields
+					token2["AmountSOL"] = solPerToken * amount
+					token2["AmountUSD"] = usdPerToken * amount
+				}
+			}
+		}
+
+		if postBalance, ok := token2["PostSwapBalance"].(float64); ok && postBalance > 0 {
+			if token1, ok := details["Token1"].(map[string]interface{}); ok {
+				if token1Amount, ok := token1["Amount"].(float64); ok && token1Amount > 0 {
+					solPerToken := token1Amount / token2["Amount"].(float64)
+					usdPerToken := solPerToken * rate
+					token2["PostSwapBalanceUSD"] = postBalance * usdPerToken
+				}
+			}
 		}
 	}
-	if preBalance, ok := token2["PreSwapBalance"].(float64); ok {
-		token2["PreSwapBalanceSOL"] = preBalance * ratio
-		token2["PreSwapBalanceUSD"] = (preBalance * ratio) * rate
-	}
 
-	// Fee enrichment
+	// Enrich Fee
 	if fee, ok := details["Fee"].(map[string]interface{}); ok {
 		if amount, ok := fee["Amount"].(float64); ok {
 			fee["AmountUSD"] = amount * rate
