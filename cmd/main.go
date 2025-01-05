@@ -16,33 +16,39 @@ import (
 
 // fetchSolToUsdRate fetches the current SOL-to-USD rate and updates the interpreter cache.
 func fetchSolToUsdRate() {
+	updateRate() // Fetch the rate immediately at startup
+
 	for {
 		interval := time.Duration(rand.Intn(481)+120) * time.Second // Random interval between 120-600s
 		time.Sleep(interval)
-
-		log.Println("Fetching SOL-to-USD exchange rate...")
-		response, err := http.Get("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
-		if err != nil {
-			log.Printf("Failed to fetch SOL-to-USD rate: %v\n", err)
-			continue
-		}
-		defer response.Body.Close()
-
-		var responseData map[string]map[string]float64
-		if err := json.NewDecoder(response.Body).Decode(&responseData); err != nil {
-			log.Printf("Failed to decode SOL-to-USD response: %v\n", err)
-			continue
-		}
-
-		rate, ok := responseData["solana"]["usd"]
-		if !ok {
-			log.Println("SOL-to-USD rate not found in response")
-			continue
-		}
-
-		interpreter.SetSolToUsdCache(rate) // Update the interpreter cache
-		log.Printf("Updated SOL-to-USD rate in interpreter: %f\n", rate)
+		updateRate()
 	}
+}
+
+// updateRate performs a single fetch of the SOL-to-USD rate and updates the cache.
+func updateRate() {
+	log.Println("Fetching SOL-to-USD exchange rate...")
+	response, err := http.Get("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
+	if err != nil {
+		log.Printf("Failed to fetch SOL-to-USD rate: %v\n", err)
+		return
+	}
+	defer response.Body.Close()
+
+	var responseData map[string]map[string]float64
+	if err := json.NewDecoder(response.Body).Decode(&responseData); err != nil {
+		log.Printf("Failed to decode SOL-to-USD response: %v\n", err)
+		return
+	}
+
+	rate, ok := responseData["solana"]["usd"]
+	if !ok {
+		log.Println("SOL-to-USD rate not found in response")
+		return
+	}
+
+	interpreter.SetSolToUsdCache(rate) // Update the interpreter cache
+	log.Printf("Updated SOL-to-USD rate in interpreter: %f\n", rate)
 }
 
 func main() {

@@ -193,7 +193,7 @@ func sendToWebhook(details map[string]interface{}, webhookURL string) (*http.Res
 
 // invokePythonScript executes the Python script and returns the result of the swap detection.
 func invokePythonScript(jsonData []byte) (string, error) {
-	cmd := exec.Command("python3", "scripts/swapdetector.py")
+	cmd := exec.Command("python", "scripts/swapdetector.py")
 	cmd.Stdin = bytes.NewBuffer(jsonData)
 	var output bytes.Buffer
 	cmd.Stdout = &output
