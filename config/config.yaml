@@ -18,6 +18,6 @@ kafka:
   poll_interval_ms: 1000
 
 application:
-  webhook_url: "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/transactionWebhook"
+  webhook_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/transactionWebhook"
   wallet_list_url: "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/getWalletList"
   wallet_update_interval_ms: 60000
