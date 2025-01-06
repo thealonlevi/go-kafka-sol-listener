@@ -3,7 +3,7 @@ kafka:
     - "rpk0.bitquery.io:9093"
     - "rpk1.bitquery.io:9093"
     - "rpk2.bitquery.io:9093"
-  group_id: "solanatest3-group-95"
+  group_id: "solanatest3-group-94"
   topic: "solana.balance_updates"
   security:
     protocol: "SASL_SSL"
@@ -19,5 +19,5 @@ kafka:
 
 application:
   webhook_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/transactionWebhook"
-  wallet_list_url: "https://s3hq4ph0s0.execute-api.eu-west-1.amazonaws.com/getWalletList"
+  wallet_list_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/getWalletList"
   wallet_update_interval_ms: 60000
