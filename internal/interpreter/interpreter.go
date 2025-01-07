@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go-kafka-sol-listener/internal/utils"
 	"log"
 	"net/http"
 	"os/exec"
 	"sync"
 )
 
-// Reference to the SOL-to-USD cache from main.go
+// Reference to the SOL-to-USD cache
 var solToUsdCache struct {
 	rate  float64
 	mutex sync.RWMutex
@@ -31,6 +32,11 @@ func getCachedSolToUsdRate() (float64, error) {
 		return 0, fmt.Errorf("SOL-to-USD rate is not available")
 	}
 	return solToUsdCache.rate, nil
+}
+
+// getInstanceUID fetches the current instance UID from the utils package.
+func getInstanceUID() string {
+	return utils.GetInstanceUID()
 }
 
 // ProcessMessage handles the input message, invokes the Python script for swap detection, and sends the results to the webhook.
@@ -65,6 +71,9 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 
 	details = ensureTokenOrder(details)
 	enrichSwapDetails(details)
+
+	// Add instanceUID to the details.
+	details["instanceUID"] = getInstanceUID()
 
 	// Log the enriched details for debugging.
 	logEnrichedDetails(details)

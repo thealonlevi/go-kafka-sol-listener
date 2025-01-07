@@ -11,8 +11,46 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 )
+
+var instanceUIDCache struct {
+	uid   string
+	mutex sync.RWMutex
+}
+
+// generateInstanceUID generates a random UID for the instance.
+func generateInstanceUID() string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	uid := make([]byte, 16)
+	for i := range uid {
+		uid[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(uid)
+}
+
+// setInstanceUIDCache sets the instance UID in the cache.
+func setInstanceUIDCache(uid string) {
+	instanceUIDCache.mutex.Lock()
+	defer instanceUIDCache.mutex.Unlock()
+	instanceUIDCache.uid = uid
+}
+
+// getInstanceUIDCache retrieves the instance UID from the cache.
+func getInstanceUIDCache() string {
+	instanceUIDCache.mutex.RLock()
+	defer instanceUIDCache.mutex.RUnlock()
+	return instanceUIDCache.uid
+}
+
+// logInstanceUID logs the instance UID every 30 seconds.
+func logInstanceUID() {
+	for {
+		log.Printf("Instance UID: %s\n", getInstanceUIDCache())
+		time.Sleep(30 * time.Second)
+	}
+}
 
 // fetchSolToUsdRate fetches the current SOL-to-USD rate and updates the interpreter cache.
 func fetchSolToUsdRate() {
@@ -52,6 +90,16 @@ func updateRate() {
 }
 
 func main() {
+	// Generate and cache the instance UID
+	instanceUID := generateInstanceUID()
+	setInstanceUIDCache(instanceUID)
+	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
+	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
+	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
+
+	// Start logging the instance UID periodically
+	go logInstanceUID()
+
 	// Load configuration
 	cfg, err := config.LoadConfig("config/config.yaml")
 	if err != nil {
