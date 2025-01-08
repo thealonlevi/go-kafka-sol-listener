@@ -36,7 +36,9 @@ func getCachedSolToUsdRate() (float64, error) {
 
 // getInstanceUID fetches the current instance UID from the utils package.
 func getInstanceUID() string {
-	return utils.GetInstanceUID()
+	uid := utils.GetInstanceUID()
+	log.Println("interpreter.go: Instance UID: ", uid)
+	return uid
 }
 
 // ProcessMessage handles the input message, invokes the Python script for swap detection, and sends the results to the webhook.

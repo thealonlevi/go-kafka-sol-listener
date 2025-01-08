@@ -7,6 +7,7 @@ import (
 	"go-kafka-sol-listener/internal/consumer"
 	"go-kafka-sol-listener/internal/interpreter" // Import interpreter to update cache
 	"go-kafka-sol-listener/internal/sniffer"
+	"go-kafka-sol-listener/internal/utils"
 	"go-kafka-sol-listener/internal/wallet"
 	"log"
 	"math/rand"
@@ -15,6 +16,7 @@ import (
 	"time"
 )
 
+// Global cache for instance UID.
 var instanceUIDCache struct {
 	uid   string
 	mutex sync.RWMutex
@@ -86,34 +88,39 @@ func updateRate() {
 	}
 
 	interpreter.SetSolToUsdCache(rate) // Update the interpreter cache
-	log.Printf("Updated SOL-to-USD rate in interpreter: %f\n", rate)
+	log.Printf("Updated SOL-to-USD rate in interpreter: %.2f\n", rate)
+}
+
+// initSystem ensures proper initialization before other operations.
+func initSystem() {
+	// Generate and set the instance UID.
+	instanceUID := generateInstanceUID()
+	setInstanceUIDCache(instanceUID)
+	utils.SetInstanceUID(instanceUID) // Sync the UID to the utils package cache
+	log.Printf("Instance UID set to: %s\n", instanceUID)
 }
 
 func main() {
-	// Generate and cache the instance UID
-	instanceUID := generateInstanceUID()
-	setInstanceUIDCache(instanceUID)
-	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
-	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
-	log.Printf("-=-=-= -=-=-=-= Generated Instance UID: %s\n", instanceUID)
+	// Ensure the system is initialized before proceeding.
+	initSystem()
 
-	// Start logging the instance UID periodically
+	// Start logging the instance UID periodically.
 	go logInstanceUID()
 
-	// Load configuration
+	// Load configuration.
 	cfg, err := config.LoadConfig("config/config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 	fmt.Printf("Loaded configuration: %+v\n", cfg)
 
-	// Initialize WalletManager
+	// Initialize WalletManager.
 	walletManager := wallet.NewWalletManager(cfg.Application.WalletListURL)
 
-	// Start WalletManager update loop
+	// Start WalletManager update loop.
 	go walletManager.UpdateWallets()
 
-	// Periodically print the wallet list
+	// Periodically print the wallet list.
 	go func() {
 		for {
 			wallets := walletManager.GetWalletList()
@@ -122,13 +129,13 @@ func main() {
 		}
 	}()
 
-	// Initialize Sniffer with webhook URL
+	// Initialize Sniffer with webhook URL.
 	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL)
 
-	// Start the SOL-to-USD rate fetcher
+	// Start the SOL-to-USD rate fetcher.
 	go fetchSolToUsdRate()
 
-	// Restart logic for the Kafka consumer
+	// Restart logic for the Kafka consumer.
 	for {
 		fmt.Println("Starting Kafka consumer...")
 		err := consumer.StartConsumer(cfg, snifferInstance)

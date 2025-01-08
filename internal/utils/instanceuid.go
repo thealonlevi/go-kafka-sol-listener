@@ -1,6 +1,9 @@
 package utils
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 var instanceUIDCache struct {
 	uid   string
@@ -18,5 +21,6 @@ func SetInstanceUID(uid string) {
 func GetInstanceUID() string {
 	instanceUIDCache.mutex.RLock()
 	defer instanceUIDCache.mutex.RUnlock()
+	log.Println("instanceuid.go: Instance UID: ", instanceUIDCache.uid)
 	return instanceUIDCache.uid
 }
