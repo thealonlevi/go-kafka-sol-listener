@@ -38,9 +38,6 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		return false
 	})
 
-	// Prepare a list to store timestamps from the Block field.
-	var blockTimestamps []int64
-
 	// Iterate through the messages to process them.
 	for _, message := range messages {
 		// Extract the transaction field from the message.
@@ -66,6 +63,7 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 		// Check if the signer exists in the wallet list and the signature is unprocessed.
 		if s.walletManager.WalletExists(signer) {
+			log.Println("Match!")
 			if utils.IsUnprocessed(signature) {
 				log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
 				utils.AddSignature(signature) // Mark the signature as being processed.
@@ -74,13 +72,7 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 				log.Printf("Duplicate signature detected: %s. Skipping.\n", signature)
 			}
 		}
-
-		// Extract the Block.Timestamp field if it exists.
-		if blockTimestamp, ok := getBlockTimestamp(message); ok {
-			blockTimestamps = append(blockTimestamps, blockTimestamp)
-		}
 	}
-
 }
 
 // processWithInterpreter forwards the message to the interpreter for swap detection.
