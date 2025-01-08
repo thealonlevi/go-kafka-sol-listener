@@ -63,14 +63,9 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 		// Check if the signer exists in the wallet list and the signature is unprocessed.
 		if s.walletManager.WalletExists(signer) {
-			log.Println("Match!")
-			if utils.IsUnprocessed(signature) {
-				log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
-				utils.AddSignature(signature) // Mark the signature as being processed.
-				go s.processWithInterpreter(message)
-			} else {
-				log.Printf("Duplicate signature detected: %s. Skipping.\n", signature)
-			}
+			log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
+			utils.AddSignature(signature) // Mark the signature as being processed.
+			go s.processWithInterpreter(message)
 		}
 	}
 }
