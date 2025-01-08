@@ -43,6 +43,26 @@ func getInstanceUID() string {
 
 // ProcessMessage handles the input message, invokes the Python script for swap detection, and sends the results to the webhook.
 func ProcessMessage(jsonData []byte, webhookURL string) error {
+	// Parse the message to extract the transaction signature.
+	var message map[string]interface{}
+	if err := json.Unmarshal(jsonData, &message); err != nil {
+		return fmt.Errorf("failed to parse JSON data: %w", err)
+	}
+
+	signature, ok := extractSignature(message)
+	if !ok {
+		return fmt.Errorf("transaction signature not found")
+	}
+
+	// Check if the transaction has already been processed.
+	if utils.IsUnprocessed(signature) {
+		log.Printf("Skipping already processed signature: %s", signature)
+		return nil
+	}
+
+	// Mark the signature as being processed.
+	utils.AddSignature(signature)
+
 	// Invoke the Python script for swap detection.
 	result, err := invokePythonScript(jsonData)
 	if err != nil {
@@ -93,6 +113,17 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	}
 
 	return nil
+}
+
+// extractSignature extracts the transaction signature from the message.
+func extractSignature(message map[string]interface{}) (string, bool) {
+	transaction, ok := message["Transaction"].(map[string]interface{})
+	if !ok {
+		return "", false
+	}
+
+	signature, ok := transaction["Signature"].(string)
+	return signature, ok
 }
 
 // ensureTokenOrder ensures that Token1 is always SOL and Token2 is the other token.
@@ -218,7 +249,7 @@ func sendToWebhook(details map[string]interface{}, webhookURL string) (*http.Res
 
 // invokePythonScript executes the Python script and returns the result of the swap detection.
 func invokePythonScript(jsonData []byte) (string, error) {
-	cmd := exec.Command("python3", "scripts/swapdetector.py")
+	cmd := exec.Command("python", "scripts/swapdetector.py")
 	cmd.Stdin = bytes.NewBuffer(jsonData)
 	var output bytes.Buffer
 	cmd.Stdout = &output

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go-kafka-sol-listener/internal/interpreter"
+	"go-kafka-sol-listener/internal/utils"
 	"go-kafka-sol-listener/internal/wallet"
 )
 
@@ -60,10 +61,22 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			continue
 		}
 
-		// Check if the signer exists in the wallet list.
+		// Extract the signature field from the transaction.
+		signature, ok := transaction["Signature"].(string)
+		if !ok {
+			log.Println("Signature field missing or invalid")
+			continue
+		}
+
+		// Check if the signer exists in the wallet list and the signature is unprocessed.
 		if s.walletManager.WalletExists(signer) {
-			log.Println("Match found for signer! Forwarding to interpreter.")
-			go s.processWithInterpreter(message) // Forward the message to the interpreter.
+			if utils.IsUnprocessed(signature) {
+				log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
+				utils.AddSignature(signature) // Mark the signature as being processed.
+				go s.processWithInterpreter(message)
+			} else {
+				log.Printf("Duplicate signature detected: %s. Skipping.\n", signature)
+			}
 		}
 
 		// Extract the Block.Timestamp field if it exists.
