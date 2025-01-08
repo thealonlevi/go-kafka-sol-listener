@@ -40,15 +40,21 @@ func MarkAsProcessed(signature string) {
 }
 
 // IsUnprocessed checks if a signature is in the cache and is unprocessed (`false`).
-// Returns `true` if it is unprocessed, otherwise `false`.
+// It marks the signature as `true` (processed) atomically if it is unprocessed.
+// Returns `true` if it was unprocessed and is now marked as processed, otherwise `false`.
 func IsUnprocessed(signature string) bool {
-	deduplicationCache.mutex.RLock()
-	defer deduplicationCache.mutex.RUnlock()
+	deduplicationCache.mutex.Lock()
+	defer deduplicationCache.mutex.Unlock()
 	processed, exists := deduplicationCache.cache[signature]
 	if !exists {
 		log.Printf("Signature not found in cache: %s", signature)
 		return false
 	}
-	log.Printf("Signature %s found in cache. Processed: %v", signature, processed)
-	return !processed
+	if !processed {
+		deduplicationCache.cache[signature] = true
+		log.Printf("Signature %s found in cache and marked as processed.", signature)
+		return true
+	}
+	log.Printf("Signature %s found in cache but already processed.", signature)
+	return false
 }
