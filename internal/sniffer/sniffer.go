@@ -5,7 +5,6 @@ import (
 	"log"
 	"sort"
 	"sync"
-	"time"
 
 	"go-kafka-sol-listener/internal/interpreter"
 	"go-kafka-sol-listener/internal/utils"
@@ -38,9 +37,6 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		}
 		return false
 	})
-
-	// Record the start timestamp to measure processing latency.
-	timestampStart := time.Now().UnixMilli()
 
 	// Prepare a list to store timestamps from the Block field.
 	var blockTimestamps []int64
@@ -85,17 +81,6 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		}
 	}
 
-	// Determine the key timestamps from the batch.
-	var timestamp1 int64
-	if len(blockTimestamps) > 0 {
-		timestamp1 = blockTimestamps[0] // Use the first timestamp in the batch for latency calculations.
-	}
-
-	// Record the end timestamp to measure processing latency.
-	timestampEnd := time.Now().UnixMilli()
-
-	// Calculate and log metrics.
-	s.logMetrics(timestampStart, timestampEnd, timestamp1)
 }
 
 // processWithInterpreter forwards the message to the interpreter for swap detection.
@@ -125,15 +110,4 @@ func getBlockTimestamp(message map[string]interface{}) (int64, bool) {
 		return 0, false
 	}
 	return int64(timestamp), true
-}
-
-// logMetrics calculates and logs the latency metrics.
-func (s *Sniffer) logMetrics(timestampStart, timestampEnd, timestamp1 int64) {
-	log.Printf("Sniffer Latency: %d ms\n", timestampEnd-timestampStart) // Log the time taken to process messages.
-	if timestamp1 > 0 {
-		log.Printf("Kafka Server Latency: %d seconds\n", (timestampStart/1000)-timestamp1) // Log the Kafka server latency in seconds.
-		log.Printf("Total Latency: %d seconds\n", (timestampEnd/1000)-timestamp1)          // Log the total latency in seconds.
-	} else {
-		log.Println("No valid timestamps found in the batch for latency calculations.")
-	}
 }
