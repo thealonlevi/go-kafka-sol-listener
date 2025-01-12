@@ -53,7 +53,7 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 		return "", "", err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer <your-token>")
+	req.Header.Add("Authorization", "Bearer ory_at_hAVdOlEkgl523t31iZllc5JtzmvWssIxakbplbh7AK4.dxrnRFAaMr9Jinapcr-cK-p7JIehLdgDfuPxQVm6uPc")
 
 	client := &http.Client{}
 	res, err := client.Do(req)
