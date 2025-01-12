@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-kafka-sol-listener/internal/utils"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -41,7 +43,48 @@ func getInstanceUID() string {
 	return uid
 }
 
-// ProcessMessage handles the input message, invokes the Python script for swap detection, and sends the results to the webhook.
+// FetchTokenSupply queries BitQuery for token information and returns the token name and supply.
+func FetchTokenSupply(mintAddress string) (string, string, error) {
+	url := "https://streaming.bitquery.io/eap"
+	payload := fmt.Sprintf(`{"query":"{\n  Solana {\n    TokenSupplyUpdates(\n      limit:{count:1}\n      orderBy:{descending:Block_Time}\n      where: {TokenSupplyUpdate: {Currency: {MintAddress: {is: \"%s\"}}}}\n    ) {\n      TokenSupplyUpdate {\n        Currency {\n          Name\n        }\n        PostBalance\n      }\n    }\n  }\n}","variables":"{}"}`, mintAddress)
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer <your-token>")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", "", err
+	}
+
+	updates := response["Solana"].(map[string]interface{})["TokenSupplyUpdates"].([]interface{})
+	if len(updates) == 0 {
+		return "", "", fmt.Errorf("no updates found")
+	}
+
+	update := updates[0].(map[string]interface{})["TokenSupplyUpdate"].(map[string]interface{})
+	name := update["Currency"].(map[string]interface{})["Name"].(string)
+	supply := update["PostBalance"].(string)
+
+	return name, supply, nil
+}
+
+// ProcessMessage handles the input message, enriches it with BitQuery data, and sends the results to the webhook.
 func ProcessMessage(jsonData []byte, webhookURL string) error {
 	// Parse the message to extract the transaction signature.
 	var message map[string]interface{}
@@ -90,9 +133,21 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	if !ok {
 		return fmt.Errorf("invalid swap details structure")
 	}
-
 	details = ensureTokenOrder(details)
 	enrichSwapDetails(details)
+
+	// Fetch token supply and update symbol.
+	token2, _ := details["Token2"].(map[string]interface{})
+	if token2 != nil {
+		mintAddress := token2["Mint"].(string)
+		name, supply, err := FetchTokenSupply(mintAddress)
+		if err != nil {
+			log.Printf("Failed to fetch token supply: %v", err)
+		} else {
+			token2["Symbol"] = name
+			token2["TokenSupply"] = supply
+		}
+	}
 
 	// Add instanceUID to the details.
 	details["instanceUID"] = getInstanceUID()
