@@ -43,14 +43,13 @@ func getInstanceUID() string {
 	return uid
 }
 
-// FetchTokenSupply queries BitQuery for token information and returns the token name and supply.
 func FetchTokenSupply(mintAddress string) (string, string, error) {
 	url := "https://streaming.bitquery.io/eap"
 	payload := fmt.Sprintf(`{"query":"{\n  Solana {\n    TokenSupplyUpdates(\n      limit:{count:1}\n      orderBy:{descending:Block_Time}\n      where: {TokenSupplyUpdate: {Currency: {MintAddress: {is: \"%s\"}}}}\n    ) {\n      TokenSupplyUpdate {\n        Currency {\n          Name\n        }\n        PostBalance\n      }\n    }\n  }\n}","variables":"{}"}`, mintAddress)
 
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "Bearer ory_at_hAVdOlEkgl523t31iZllc5JtzmvWssIxakbplbh7AK4.dxrnRFAaMr9Jinapcr-cK-p7JIehLdgDfuPxQVm6uPc")
@@ -58,30 +57,52 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var response map[string]interface{}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
-	updates := response["Solana"].(map[string]interface{})["TokenSupplyUpdates"].([]interface{})
-	if len(updates) == 0 {
-		return "", "", fmt.Errorf("no updates found")
+	// Validate and traverse the JSON response
+	solana, ok := response["Solana"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing or invalid 'Solana' field")
 	}
 
-	update := updates[0].(map[string]interface{})["TokenSupplyUpdate"].(map[string]interface{})
-	name := update["Currency"].(map[string]interface{})["Name"].(string)
-	supply := update["PostBalance"].(string)
+	tokenSupplyUpdates, ok := solana["TokenSupplyUpdates"].([]interface{})
+	if !ok || len(tokenSupplyUpdates) == 0 {
+		return "", "", fmt.Errorf("no 'TokenSupplyUpdates' found")
+	}
 
-	return name, supply, nil
+	tokenSupplyUpdate, ok := tokenSupplyUpdates[0].(map[string]interface{})["TokenSupplyUpdate"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing 'TokenSupplyUpdate' in response")
+	}
+
+	currency, ok := tokenSupplyUpdate["Currency"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing 'Currency' field in 'TokenSupplyUpdate'")
+	}
+
+	name, ok := currency["Name"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("'Name' field is missing or invalid in 'Currency'")
+	}
+
+	postBalance, ok := tokenSupplyUpdate["PostBalance"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("'PostBalance' field is missing or invalid in 'TokenSupplyUpdate'")
+	}
+
+	return name, postBalance, nil
 }
 
 // ProcessMessage handles the input message, enriches it with BitQuery data, and sends the results to the webhook.
