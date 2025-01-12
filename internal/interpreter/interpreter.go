@@ -43,11 +43,33 @@ func getInstanceUID() string {
 	return uid
 }
 
+// FetchTokenSupply queries BitQuery for token information and returns the token name and supply.
 func FetchTokenSupply(mintAddress string) (string, string, error) {
 	url := "https://streaming.bitquery.io/eap"
-	payload := fmt.Sprintf(`{"query":"{\n  Solana {\n    TokenSupplyUpdates(\n      limit:{count:1}\n      orderBy:{descending:Block_Time}\n      where: {TokenSupplyUpdate: {Currency: {MintAddress: {is: \"%s\"}}}}\n    ) {\n      TokenSupplyUpdate {\n        Currency {\n          Name\n        }\n        PostBalance\n      }\n    }\n  }\n}","variables":"{}"}`, mintAddress)
 
-	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
+	query := fmt.Sprintf(`{
+		Solana {
+			TokenSupplyUpdates(
+				limit: { count: 1 },
+				orderBy: { descending: Block_Time },
+				where: { TokenSupplyUpdate: { Currency: { MintAddress: { is: "%s" } } } }
+			) {
+				TokenSupplyUpdate {
+					Amount
+					Currency {
+						MintAddress
+						Name
+					}
+					PreBalance
+					PostBalance
+				}
+			}
+		}
+	}`, mintAddress)
+
+	payload := strings.NewReader(fmt.Sprintf(`{"query": %q, "variables": "{}"}`, query))
+
+	req, err := http.NewRequest("POST", url, payload)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -62,6 +84,7 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
+	log.Println(string(body))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -72,9 +95,14 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 	}
 
 	// Validate and traverse the JSON response
-	solana, ok := response["Solana"].(map[string]interface{})
+	data, ok := response["data"].(map[string]interface{})
 	if !ok {
-		return "", "", fmt.Errorf("missing or invalid 'Solana' field")
+		return "", "", fmt.Errorf("missing 'data' field")
+	}
+
+	solana, ok := data["Solana"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing 'Solana' field")
 	}
 
 	tokenSupplyUpdates, ok := solana["TokenSupplyUpdates"].([]interface{})
@@ -82,12 +110,17 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 		return "", "", fmt.Errorf("no 'TokenSupplyUpdates' found")
 	}
 
-	tokenSupplyUpdate, ok := tokenSupplyUpdates[0].(map[string]interface{})["TokenSupplyUpdate"].(map[string]interface{})
+	tokenSupplyUpdate, ok := tokenSupplyUpdates[0].(map[string]interface{})
 	if !ok {
 		return "", "", fmt.Errorf("missing 'TokenSupplyUpdate' in response")
 	}
 
-	currency, ok := tokenSupplyUpdate["Currency"].(map[string]interface{})
+	updateData, ok := tokenSupplyUpdate["TokenSupplyUpdate"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("invalid 'TokenSupplyUpdate' structure")
+	}
+
+	currency, ok := updateData["Currency"].(map[string]interface{})
 	if !ok {
 		return "", "", fmt.Errorf("missing 'Currency' field in 'TokenSupplyUpdate'")
 	}
@@ -97,7 +130,7 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 		return "", "", fmt.Errorf("'Name' field is missing or invalid in 'Currency'")
 	}
 
-	postBalance, ok := tokenSupplyUpdate["PostBalance"].(string)
+	postBalance, ok := updateData["PostBalance"].(string)
 	if !ok {
 		return "", "", fmt.Errorf("'PostBalance' field is missing or invalid in 'TokenSupplyUpdate'")
 	}
@@ -107,12 +140,13 @@ func FetchTokenSupply(mintAddress string) (string, string, error) {
 
 // ProcessMessage handles the input message, enriches it with BitQuery data, and sends the results to the webhook.
 func ProcessMessage(jsonData []byte, webhookURL string) error {
+	log.Println("Salam")
 	// Parse the message to extract the transaction signature.
 	var message map[string]interface{}
 	if err := json.Unmarshal(jsonData, &message); err != nil {
 		return fmt.Errorf("failed to parse JSON data: %w", err)
 	}
-
+	log.Println("Hello")
 	signature, ok := extractSignature(message)
 	if !ok {
 		return fmt.Errorf("transaction signature not found")
@@ -123,16 +157,17 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 		log.Printf("Skipping already processed signature: %s", signature)
 		return nil
 	}
-
+	log.Println("One")
 	// Mark the signature as being processed.
 	utils.AddSignature(signature)
 
 	// Invoke the Python script for swap detection.
 	result, err := invokePythonScript(jsonData)
 	if err != nil {
+		log.Println("WTF")
 		return fmt.Errorf("failed to invoke Python script: %w", err)
 	}
-
+	log.Println("Two")
 	log.Printf("Python script output: %s", result)
 
 	var swapDetails map[string]interface{}
@@ -161,13 +196,17 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	token2, _ := details["Token2"].(map[string]interface{})
 	if token2 != nil {
 		mintAddress := token2["Mint"].(string)
+		log.Println("uno")
 		name, supply, err := FetchTokenSupply(mintAddress)
+		log.Println("duo")
 		if err != nil {
 			log.Printf("Failed to fetch token supply: %v", err)
 		} else {
 			token2["Symbol"] = name
 			token2["TokenSupply"] = supply
 		}
+	} else {
+		log.Println("Alekum")
 	}
 
 	// Add instanceUID to the details.
