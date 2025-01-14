@@ -7,7 +7,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Config represents the configuration structure for the application.
 type Config struct {
 	Kafka struct {
 		BootstrapServers []string `yaml:"bootstrap_servers"`
@@ -30,10 +29,21 @@ type Config struct {
 		WebhookURL             string `yaml:"webhook_url"`
 		WalletListURL          string `yaml:"wallet_list_url"`
 		WalletUpdateIntervalMs int    `yaml:"wallet_update_interval_ms"`
+		UIDCharset             string `yaml:"uid_charset"`
+		SolToUsdAPIURL         string `yaml:"sol_to_usd_api_url"`
 	} `yaml:"application"`
+	Interpreter struct {
+		BitqueryToken      string `yaml:"bitquery_token"`
+		Python             string `yaml:"python"`
+		SwapDetectorScript string `yaml:"swap_detector_script"`
+	} `yaml:"interpreter"`
+	Metrics struct {
+		FlushIntervalSeconds int    `yaml:"flush_interval_seconds"`
+		CloudEndpoint        string `yaml:"cloud_endpoint"`
+		MaxMetricsCacheSize  int    `yaml:"max_metrics_cache_size"`
+	} `yaml:"metrics"`
 }
 
-// LoadConfig loads the configuration from the specified YAML file.
 func LoadConfig(filepath string) (*Config, error) {
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {

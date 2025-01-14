@@ -10,15 +10,18 @@ import (
 )
 
 type WalletManager struct {
-	walletMap map[string]bool
-	mutex     sync.RWMutex
-	url       string
+	walletMap      map[string]bool
+	mutex          sync.RWMutex
+	url            string
+	updateInterval time.Duration // Interval between updates
 }
 
-func NewWalletManager(url string) *WalletManager {
+// NewWalletManager initializes a new WalletManager with the given URL and update interval
+func NewWalletManager(url string, updateIntervalSeconds int) *WalletManager {
 	return &WalletManager{
-		walletMap: make(map[string]bool),
-		url:       url,
+		walletMap:      make(map[string]bool),
+		url:            url,
+		updateInterval: time.Duration(updateIntervalSeconds) * time.Second,
 	}
 }
 
@@ -28,28 +31,28 @@ func (wm *WalletManager) UpdateWallets() {
 		resp, err := http.Get(wm.url)
 		if err != nil {
 			log.Printf("Failed to fetch wallet list: %v\n", err)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(wm.updateInterval)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Non-OK HTTP status: %s\n", resp.Status)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(wm.updateInterval)
 			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Printf("Failed to read wallet list response: %v\n", err)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(wm.updateInterval)
 			continue
 		}
 
 		var walletList []string
 		if err := json.Unmarshal(body, &walletList); err != nil {
 			log.Printf("Failed to parse wallet list: %v\n", err)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(wm.updateInterval)
 			continue
 		}
 
@@ -65,13 +68,7 @@ func (wm *WalletManager) UpdateWallets() {
 
 		log.Println("Wallet list updated successfully.")
 
-		// Print all wallets in the updated wallet list
-		log.Println("Current wallet list:")
-		for wallet := range newWalletMap {
-			log.Println(wallet)
-		}
-
-		time.Sleep(1 * time.Minute)
+		time.Sleep(wm.updateInterval) // Use configured interval
 	}
 }
 

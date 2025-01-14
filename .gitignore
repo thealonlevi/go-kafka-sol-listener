@@ -17,6 +17,7 @@ bin/
 old/
 dump/
 test/
+matches/
 
 # Configuration files
 #.env
