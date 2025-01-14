@@ -26,11 +26,11 @@ type Config struct {
 		PollIntervalMs  int    `yaml:"poll_interval_ms"`
 	} `yaml:"kafka"`
 	Application struct {
-		WebhookURL             string `yaml:"webhook_url"`
-		WalletListURL          string `yaml:"wallet_list_url"`
-		WalletUpdateIntervalMs int    `yaml:"wallet_update_interval_ms"`
-		UIDCharset             string `yaml:"uid_charset"`
-		SolToUsdAPIURL         string `yaml:"sol_to_usd_api_url"`
+		WebhookURL                  string `yaml:"webhook_url"`
+		WalletListURL               string `yaml:"wallet_list_url"`
+		WalletUpdateIntervalSeconds int    `yaml:"wallet_update_interval"`
+		UIDCharset                  string `yaml:"uid_charset"`
+		SolToUsdAPIURL              string `yaml:"sol_to_usd_api_url"`
 	} `yaml:"application"`
 	Interpreter struct {
 		BitqueryToken      string `yaml:"bitquery_token"`
