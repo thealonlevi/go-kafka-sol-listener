@@ -1,0 +1,69 @@
+import os
+import requests
+import json
+
+def send_file_to_lambda(file_path, lambda_url):
+    try:
+        # Read the JSON file content
+        with open(file_path, 'r') as f:
+            file_content = f.read()
+
+        # Make a POST request to the Lambda function
+        response = requests.post(lambda_url, json={"body": file_content})
+
+        # Check the response status
+        if response.status_code == 200:
+            print(f"Successfully uploaded {os.path.basename(file_path)}")
+            return True
+        else:
+            print(f"Failed to upload {os.path.basename(file_path)}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Error processing {file_path}: {str(e)}")
+        return False
+
+def clear_directory(directory):
+    try:
+        for file_name in os.listdir(directory):
+            file_path = os.path.join(directory, file_name)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        print("Directory cleared successfully.")
+    except Exception as e:
+        print(f"Error clearing directory: {str(e)}")
+
+# Main script
+def main():
+    matches_directory = "matches"
+    lambda_url = "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/sendToBucket"
+
+    # Check if the directory exists
+    if not os.path.exists(matches_directory):
+        print(f"Directory '{matches_directory}' does not exist.")
+        return
+
+    # Process each .json file in the directory
+    all_files = os.listdir(matches_directory)
+    json_files = [f for f in all_files if f.endswith(".json")]
+
+    if not json_files:
+        print("No .json files found in the directory.")
+        return
+
+    for file_name in json_files:
+        file_path = os.path.join(matches_directory, file_name)
+
+        # Send the file to the Lambda function
+        if send_file_to_lambda(file_path, lambda_url):
+            # If successful, delete the file
+            os.remove(file_path)
+
+    # Check if the directory is now empty
+    remaining_files = os.listdir(matches_directory)
+    if not remaining_files:
+        print("All files processed and directory emptied.")
+    else:
+        print(f"Some files remain in the directory: {remaining_files}")
+
+if __name__ == "__main__":
+    main()
