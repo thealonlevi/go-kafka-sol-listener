@@ -22,14 +22,16 @@ type Sniffer struct {
 	mutex          sync.Mutex              // Ensures thread-safe operations.
 	webhookURL     string                  // The endpoint where matched messages are sent.
 	metricsHandler *metrics.MetricsHandler // Handles metrics aggregation and reporting.
+	saveMatches    string                  // Controls whether to save matched messages.
 }
 
-// NewSniffer initializes a new Sniffer with a wallet manager, webhook URL, and metrics handler.
-func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler) *Sniffer {
+// NewSniffer initializes a new Sniffer with a wallet manager, webhook URL, metrics handler, and saveMatches flag.
+func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler, saveMatches string) *Sniffer {
 	return &Sniffer{
 		walletManager:  walletManager,
 		webhookURL:     webhookURL,
 		metricsHandler: metricsHandler,
+		saveMatches:    saveMatches,
 	}
 }
 
@@ -73,8 +75,10 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
 			utils.AddSignature(signature) // Mark the signature as being processed.
 
-			// Save the entire JSON message to a file.
-			s.saveMatchToFile(signature, message)
+			// Save the match if saveMatches is enabled.
+			if s.saveMatches != "off" {
+				s.saveMatchToFile(signature, message)
+			}
 
 			// Forward to interpreter.
 			go s.processWithInterpreter(message)
@@ -92,7 +96,7 @@ func (s *Sniffer) recordMetrics(message map[string]interface{}) {
 		return
 	}
 
-	localTimestamp := time.Now().Unix()
+	localTimestamp := time.Now().Unix()                           // Convert to seconds
 	go s.metricsHandler.AddMetric(blockTimestamp, localTimestamp) // Non-blocking metrics recording.
 }
 

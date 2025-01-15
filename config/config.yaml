@@ -23,6 +23,7 @@ application:
   wallet_update_interval: 30
   uid_charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
   sol_to_usd_api_url: "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+  save_matches: "off"
 
 interpreter:
   bitquery_token: "ory_at_-mbOudJvKgJ1bSQ9upzINUpt1FHMbXHYd1Sa5yKs_ZU.DiWP8GQ7ZgbhrE1-Xdv0ibf32OfWJefg15cU0Y-mqMY"
@@ -33,3 +34,4 @@ metrics:
   flush_interval_seconds: 60
   cloud_endpoint: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/go-kafka-sol-listener-metrics"
   max_metrics_cache_size: 10000
+

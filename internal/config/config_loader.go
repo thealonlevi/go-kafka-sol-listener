@@ -1,12 +1,13 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
-	"log"
 
 	"gopkg.in/yaml.v2"
 )
 
+// Config holds the application's configuration structure.
 type Config struct {
 	Kafka struct {
 		BootstrapServers []string `yaml:"bootstrap_servers"`
@@ -31,6 +32,7 @@ type Config struct {
 		WalletUpdateIntervalSeconds int    `yaml:"wallet_update_interval"`
 		UIDCharset                  string `yaml:"uid_charset"`
 		SolToUsdAPIURL              string `yaml:"sol_to_usd_api_url"`
+		SaveMatches                 string `yaml:"save_matches"` // Ensure this matches the YAML field
 	} `yaml:"application"`
 	Interpreter struct {
 		BitqueryToken      string `yaml:"bitquery_token"`
@@ -44,18 +46,38 @@ type Config struct {
 	} `yaml:"metrics"`
 }
 
+// LoadConfig reads and parses a YAML configuration file into a Config struct.
 func LoadConfig(filepath string) (*Config, error) {
+	// Read the config file
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		log.Fatalf("Failed to read config file: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
+	// Unmarshal the YAML data into the Config struct
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		log.Fatalf("Failed to parse config file: %v", err)
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Validate and return the configuration
+	if err := validateConfig(&cfg); err != nil {
 		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+// validateConfig ensures required fields in the configuration are populated.
+func validateConfig(cfg *Config) error {
+	if cfg.Application.WebhookURL == "" {
+		return fmt.Errorf("application.webhook_url is required")
+	}
+	if cfg.Application.WalletListURL == "" {
+		return fmt.Errorf("application.wallet_list_url is required")
+	}
+	if cfg.Kafka.GroupID == "" || len(cfg.Kafka.BootstrapServers) == 0 {
+		return fmt.Errorf("kafka.bootstrap_servers and kafka.group_id are required")
+	}
+	return nil
 }
