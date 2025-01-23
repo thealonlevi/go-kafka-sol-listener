@@ -69,23 +69,9 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 
 	log.Printf("Swap detected: %v", swapDetails)
 
-	// Enrich the swap details with USD calculations.
-	details, ok := swapDetails["details"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid swap details structure")
-	}
-	details = ensureTokenOrder(details)
-
-	// Use cached SOL-to-USD rate for enrichment.
-	rate, err := getCachedSolToUsdRate()
-	if err != nil {
-		log.Printf("Failed to fetch SOL-to-USD rate: %v", err)
-	}
-	enrichSwapDetails(details, rate)
-
 	// Send enriched details to the webhook.
 	log.Printf("Sending enriched details to webhook: %s", webhookURL)
-	resp, err := sendToWebhook(details, webhookURL)
+	resp, err := sendToWebhook(swapDetails, webhookURL)
 	if err != nil {
 		return fmt.Errorf("failed to send enriched details to webhook: %w", err)
 	}
