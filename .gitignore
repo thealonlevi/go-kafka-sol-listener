@@ -18,6 +18,7 @@ old/
 dump/
 test/
 matches/
+tx_interpreter.egg-info/
 
 # Configuration files
 #.env
