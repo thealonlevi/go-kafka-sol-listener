@@ -1,7 +1,8 @@
 import copy
 from tx_interpreter.filters import (
     TokenFilter,
-    SignerFilter
+    SignerFilter,
+    NotSignerFilter
 )
 from tx_interpreter.utils import (
     BalanceCalculator,
@@ -59,16 +60,20 @@ def sol_swaps(data):
     """
 
     # 1) Make deep copies for partial filtering
-    signer_data = copy.deepcopy(data)
+    signer_data, notsigner_data = copy.deepcopy(data), copy.deepcopy(data)
     first_token_data = copy.deepcopy(data)
     sol_token_data = copy.deepcopy(data)
 
     # 2) Filter out only the signer's balance updates
     signer_data["BalanceUpdates"] = SignerFilter(signer_data).apply()
+    notsigner_data["BalanceUpdates"] = NotSignerFilter(notsigner_data).apply()
 
     # 3) Additional copies to isolate SOL vs. other token from the signer
     sol_token_signer_data = copy.deepcopy(signer_data)
     first_token_signer_data = copy.deepcopy(signer_data)
+    
+    sol_token_notsigner_data = copy.deepcopy(notsigner_data)
+    first_token_notsigner_data = copy.deepcopy(notsigner_data)
 
     # 4) Identify which tokens are involved
     tokens = get_currencies_involved(signer_data)
@@ -87,12 +92,17 @@ def sol_swaps(data):
     # ...and for the signer-specific data
     first_token_signer_data["BalanceUpdates"] = TokenFilter(signer_data, tokens[token_index]).apply()
     sol_token_signer_data["BalanceUpdates"] = TokenFilter(signer_data, tokens[sol_index]).apply()
+    
+    first_token_notsigner_data["BalanceUpdates"] = TokenFilter(notsigner_data, tokens[token_index]).apply()
+    sol_token_notsigner_data["BalanceUpdates"] = TokenFilter(notsigner_data, tokens[sol_index]).apply()
 
     # 6) Compute decimal-based differences for each token
     first_token_differences = BalanceCalculator.calculate_balance_differences(first_token_data)
     sol_token_differences   = BalanceCalculator.calculate_balance_differences(sol_token_data)
     first_token_diffs_signer = BalanceCalculator.calculate_balance_differences(first_token_signer_data)
     sol_token_diffs_signer   = BalanceCalculator.calculate_balance_differences(sol_token_signer_data)
+    first_token_diffs_notsigner = BalanceCalculator.calculate_balance_differences(first_token_notsigner_data)
+    sol_token_diffs_notsigner   = BalanceCalculator.calculate_balance_differences(sol_token_notsigner_data)
 
     # 7) Detect a swap
     data["swapDetected"] = (
@@ -104,11 +114,13 @@ def sol_swaps(data):
     sol_to_token = (sum(sol_token_diffs_signer) > 0)
 
     # 9) Find the dominant figure for each token
-    first_dom_figs = DominantFigureFilter.filter_dominant_figures(first_token_differences)
-    sol_dom_figs   = DominantFigureFilter.filter_dominant_figures(sol_token_differences)
+    first_dom_figs = DominantFigureFilter.filter_dominant_figures(first_token_diffs_notsigner)
+    sol_dom_figs   = DominantFigureFilter.filter_dominant_figures(sol_token_diffs_notsigner)
 
     # Expect only one dominant figure per token
     if len(first_dom_figs) > 1 or len(sol_dom_figs) > 1:
+        print(first_dom_figs)
+        print(sol_dom_figs)
         raise ValueError("[ERROR] Failed to analyze swap.")
 
     # 10) Retrieve decimals
@@ -170,8 +182,6 @@ def sol_swaps(data):
     chain_fee, trade_fee = fee_calculator(data)
     chain_fee = parse_amount(chain_fee, sol_decimals)
     trade_fee = parse_amount(trade_fee, sol_decimals)
-    
-    print(chain_fee, trade_fee)
 
     # 13) Build final payload
     swap_data = {
