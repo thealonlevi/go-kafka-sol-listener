@@ -28,10 +28,7 @@ def main():
 
     # File IDs (without .json extension)
     file_ids = [
-        "4WaP4sDDTbGG32NSefYZCTTLAD7oapftaBs3uipWt3SfNjtrDbAY6Csq2Kubw1pAnKR8GjB6AY2GWSj4BtR3RWdq",
-        "5WsaAedparyv3vJMqXNGFJSgaP2qFeJTsssYZodjXK4juhgUu6rAAWBQot3wP369WkATqSunaxDevZVqYYLnnkm6",
-        "Y5bZFbrQmjKpCcE6CUGNHSAZgFj2yQmQoVWJk3xYQdtXDKtw2noE5kMHM8EDR4oyCUSCefknhWxbxehLjzP65Cu",
-        "5G3Y8jcfG8myzCAdkuy5iRxdXnf2fZQWX2268rS1hYr6CMvpt32fUmzQBi9QwUrdwzJZ2LrBoAfszr562a7sAyAH"
+        "5xTQUQnp7xYFXsEeruZFWXLgtsY58QGZuCKhhCoqGTRU84CVQTKpNDGnwCx4kX9yuJ5xoiMtBArxz4MV8e9dY4D5"
     ]
 
     if not os.path.exists(matches_directory):
@@ -49,13 +46,6 @@ def main():
                 os.remove(file_path)
         else:
             print(f"File not found: {file_name}")
-
-    # Check if any files remain in the directory
-    remaining_files = os.listdir(matches_directory)
-    if not remaining_files:
-        print("All specified files were processed and the directory is now empty.")
-    else:
-        print(f"Some files remain in the directory: {remaining_files}")
 
 if __name__ == "__main__":
     main()
