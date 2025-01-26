@@ -117,40 +117,32 @@ def fetch_token_supply(mint_address: str, bitquery_token: str) -> (str, str):
     err = False
     if not solana:
         err = True
-        print("Missing 'Solana' field in response data.")
+        
 
     token_supply_updates = solana.get("TokenSupplyUpdates", [])
     if not token_supply_updates:
         err = True
-        print("No 'TokenSupplyUpdates' found in response.")
         return "", 0
     try:
         ts_update = token_supply_updates[0].get("TokenSupplyUpdate")
     except:
         err = True
-        print("Missing 'TokenSupplyUpdate' in response item.")
         return "", 0
     
     if not ts_update:
         err = True
-        print("Missing 'TokenSupplyUpdate' in response item.")
 
     currency = ts_update.get("Currency")
     if not currency:
         err = True
-        print("Missing 'Currency' field in 'TokenSupplyUpdate'.")
 
     name = currency.get("Name")
     if not name:
         err = True
-        print("Token 'Name' missing or invalid in response.")
-
     post_balance = ts_update.get("PostBalance")
 
     if post_balance is None:
         err = True
-        print("'PostBalance' field is missing or invalid in 'TokenSupplyUpdate'.")
-    
     
     if err:
         return "", 0
@@ -179,15 +171,12 @@ def enrich_token_supply(tx_details: dict, bitquery_token: str) -> dict:
     # Skip if there's no mint address or it's the SOL mint address
     if not mint or mint == "11111111111111111111111111111111":
         return tx_details
-    try: 
-        name, supply = fetch_token_supply(mint, bitquery_token)
-        if not name == "":
-            to_token["Symbol"] = name
-        to_token["TokenSupply"] = float(supply)
+      
+    name, supply = fetch_token_supply(mint, bitquery_token)
+    if not name == "":
+        to_token["Symbol"] = name
+    to_token["TokenSupply"] = float(supply)
 
-    except Exception as e:
-        # Log or handle the error as needed
-        print(f"Failed to fetch token supply for {mint}: {e}")
     
     if tosol:
         tx_details['FromToken'] = to_token

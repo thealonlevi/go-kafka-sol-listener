@@ -27,7 +27,7 @@ application:
 
 interpreter:
   bitquery_token: "ory_at_-mbOudJvKgJ1bSQ9upzINUpt1FHMbXHYd1Sa5yKs_ZU.DiWP8GQ7ZgbhrE1-Xdv0ibf32OfWJefg15cU0Y-mqMY"
-  python: "python3"
+  python: ".venv/Scripts/python.exe"
   swap_detector_script: "scripts/swap.py"
 
 metrics:
