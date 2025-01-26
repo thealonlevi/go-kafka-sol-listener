@@ -119,8 +119,6 @@ def sol_swaps(data):
 
     # Expect only one dominant figure per token
     if len(first_dom_figs) > 1 or len(sol_dom_figs) > 1:
-        print(first_dom_figs)
-        print(sol_dom_figs)
         raise ValueError("[ERROR] Failed to analyze swap.")
 
     # 10) Retrieve decimals
