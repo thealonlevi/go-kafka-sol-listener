@@ -98,12 +98,10 @@ def fee_calculator(data):
 
     # Non-signer differences
     token1_outputbalances = BalanceCalculator().calculate_balance_differences(token1_notsignerdata)
-    
-    print(token1_outputbalances)
 
     # Identify dominant figures (liquidity pools, etc.)
     token1_liquiditypool = DominantFigureFilter().filter_dominant_figures(token1_outputbalances)
-    print("Token1 Liquidity Pool: ", token1_liquiditypool)
+
 
     # Example fee calculation approach
     if abs(sum(token1_liquiditypool))>abs(sum(token1_outputbalances)):

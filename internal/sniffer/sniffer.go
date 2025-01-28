@@ -49,29 +49,40 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 
 	// Iterate through the messages to process them.
 	for _, message := range messages {
-		// Extract the transaction field from the message.
+		// 1. Check if Transaction.Status.Success is true.
+		success, ok := getTransactionSuccess(message)
+		if !ok || !success {
+			log.Println("Transaction did not succeed, skipping.")
+			continue
+		}
+
+		// 2. Extract the transaction field from the message.
 		transaction, ok := message["Transaction"].(map[string]interface{})
 		if !ok {
 			log.Println("Transaction field missing or invalid")
 			continue
 		}
 
-		// Extract the signer field from the transaction.
+		// 3. Extract the signer field from the transaction.
 		signer, ok := transaction["Signer"].(string)
 		if !ok {
 			log.Println("Signer field missing or invalid")
 			continue
 		}
 
-		// Extract the signature field from the transaction.
+		// 4. Extract the signature field from the transaction.
 		signature, ok := transaction["Signature"].(string)
 		if !ok {
 			log.Println("Signature field missing or invalid")
 			continue
 		}
 
-		// Check if the signer exists in the wallet list and the signature is unprocessed.
+		// 5. Lock mutex to ensure thread safety when accessing shared resources.
+		s.mutex.Lock()
+
+		// 6. Check if the signer exists in the wallet list.
 		if s.walletManager.WalletExists(signer) {
+			// Signer exists: Process as a transfer.
 			log.Println("Match found for signer and unprocessed signature! Forwarding to interpreter.")
 			utils.AddSignature(signature) // Mark the signature as being processed.
 
@@ -80,12 +91,94 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 				s.saveMatchToFile(signature, message)
 			}
 
+			// Unlock mutex before starting goroutine.
+			s.mutex.Unlock()
+
 			// Forward to interpreter.
 			go s.processWithInterpreter(message)
+		} else {
+			// Signer does not exist: Check BalanceUpdates for Token.Owner matches.
+			log.Println("Signer not in wallet manager, checking BalanceUpdates for token owners.")
+
+			// Extract BalanceUpdates
+			balanceUpdates, ok := message["BalanceUpdates"].([]map[string]interface{})
+			if !ok {
+				log.Println("BalanceUpdates field missing or invalid")
+				s.mutex.Unlock()
+				continue
+			}
+
+			// Ensure there are fewer than 20 BalanceUpdates to prevent excessive processing.
+			if len(balanceUpdates) >= 20 {
+				log.Println("BalanceUpdates length >=20, skipping.")
+				s.mutex.Unlock()
+				continue
+			}
+
+			// Iterate over BalanceUpdates to check Token.Owner
+			matched := false
+			for _, balanceUpdate := range balanceUpdates {
+				balanceUpdateData, ok := balanceUpdate["BalanceUpdate"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				accountData, ok := balanceUpdateData["Account"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				tokenData, ok := accountData["Token"].(map[string]interface{})
+				if !ok || tokenData == nil {
+					continue
+				}
+				owner, ok := tokenData["Owner"].(string)
+				if !ok {
+					continue
+				}
+
+				// Check if Token.Owner exists in the wallet manager.
+				if s.walletManager.WalletExists(owner) {
+					log.Println("Match found for Token.Owner and unprocessed signature! Forwarding to interpreter.")
+					utils.AddSignature(signature) // Mark the signature as being processed.
+
+					// Save the match if saveMatches is enabled.
+					if s.saveMatches != "off" {
+						s.saveMatchToFile(signature, message)
+					}
+
+					// Unlock mutex before starting goroutine.
+					s.mutex.Unlock()
+
+					// Forward to interpreter.
+					go s.processWithInterpreter(message)
+					matched = true
+					break // Exit loop after first match.
+				}
+			}
+
+			if !matched {
+				log.Println("No matching Token.Owner found in wallet manager.")
+				// Unlock mutex as we didn't process
+				s.mutex.Unlock()
+			}
 		}
 
+		// 7. Record metrics regardless of processing.
 		s.recordMetrics(message)
 	}
+}
+
+// getTransactionSuccess extracts the Transaction.Status.Success value from a message.
+func getTransactionSuccess(message map[string]interface{}) (bool, bool) {
+	transaction, ok := message["Transaction"].(map[string]interface{})
+	if !ok {
+		return false, false
+	}
+	status, ok := transaction["Status"].(map[string]interface{})
+	if !ok {
+		return false, false
+	}
+	success, ok := status["Success"].(bool)
+	return success, ok
 }
 
 // recordMetrics extracts timestamps and logs metrics for the message.
@@ -96,7 +189,7 @@ func (s *Sniffer) recordMetrics(message map[string]interface{}) {
 		return
 	}
 
-	localTimestamp := time.Now().Unix()                           // Convert to seconds
+	localTimestamp := time.Now().Unix()                           // Current time in Unix seconds
 	go s.metricsHandler.AddMetric(blockTimestamp, localTimestamp) // Non-blocking metrics recording.
 }
 
@@ -128,7 +221,7 @@ func (s *Sniffer) saveMatchToFile(signature string, message map[string]interface
 	log.Printf("Match saved to file: %s\n", filePath)
 }
 
-// processWithInterpreter forwards the message to the interpreter for swap detection.
+// processWithInterpreter forwards the message to the interpreter for swap or transfer detection.
 func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
 	// Convert the message to JSON format.
 	jsonData, err := json.Marshal(message)

@@ -212,7 +212,7 @@ def enricher(base_data: dict, swap_data: dict) -> dict:
     if is_to_sol:
         sol_amount = swap_data['ToToken']['AmountChange']
         token_amount = swap_data['FromToken']['AmountChange']
-        sol_token_ratio = token_amount / sol_amount
+        sol_token_ratio = abs(token_amount) / abs(sol_amount)
 
         # Enrich ToToken (SOL)
         swap_data['ToToken']['AmountSOL'] = sol_amount
@@ -237,7 +237,7 @@ def enricher(base_data: dict, swap_data: dict) -> dict:
     else:
         token_amount = swap_data['ToToken']['AmountChange']
         sol_amount = swap_data['FromToken']['AmountChange']
-        sol_token_ratio = token_amount / sol_amount
+        sol_token_ratio = abs(token_amount) / abs(sol_amount)
 
         # Enrich FromToken (SOL)
         swap_data['FromToken']['AmountSOL'] = sol_amount
