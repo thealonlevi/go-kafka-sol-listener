@@ -54,28 +54,24 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 		// 1. Check if Transaction.Status.Success is true.
 		success, ok := getTransactionSuccess(message)
 		if !ok || !success {
-			log.Println("Transaction did not succeed, skipping.")
 			continue
 		}
 
 		// 2. Extract the transaction field from the message.
 		transaction, ok := message["Transaction"].(map[string]interface{})
 		if !ok {
-			log.Println("Transaction field missing or invalid")
 			continue
 		}
 
 		// 3. Extract the signer field from the transaction.
 		signer, ok := transaction["Signer"].(string)
 		if !ok {
-			log.Println("Signer field missing or invalid")
 			continue
 		}
 
 		// 4. Extract the signature field from the transaction.
 		signature, ok := transaction["Signature"].(string)
 		if !ok {
-			log.Println("Signature field missing or invalid")
 			continue
 		}
 
@@ -100,19 +96,16 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			go s.processWithInterpreter(message)
 		} else {
 			// Signer does not exist: Check BalanceUpdates for Token.Owner matches.
-			log.Println("Signer not in wallet manager, checking BalanceUpdates for token owners.")
 
 			// Extract BalanceUpdates
 			balanceUpdates, ok := message["BalanceUpdates"].([]map[string]interface{})
 			if !ok {
-				log.Println("BalanceUpdates field missing or invalid")
 				s.mutex.Unlock()
 				continue
 			}
 
 			// Ensure there are fewer than 20 BalanceUpdates to prevent excessive processing.
 			if len(balanceUpdates) >= 20 {
-				log.Println("BalanceUpdates length >=20, skipping.")
 				s.mutex.Unlock()
 				continue
 			}
@@ -158,7 +151,6 @@ func (s *Sniffer) HandleMessages(messages []map[string]interface{}) {
 			}
 
 			if !matched {
-				log.Println("No matching Token.Owner found in wallet manager.")
 				// Unlock mutex as we didn't process
 				s.mutex.Unlock()
 			}
