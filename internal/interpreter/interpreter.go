@@ -24,7 +24,7 @@ func InitializeInterpreterConfig(cfg *config.Config) {
 }
 
 // ProcessMessage handles the input message, enriches it with BitQuery data, and sends the results to the webhook.
-func ProcessMessage(jsonData []byte, webhookURL string) error {
+func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL string) error {
 	log.Println("Starting ProcessMessage")
 
 	// Parse the message to extract the transaction signature.
@@ -63,13 +63,24 @@ func ProcessMessage(jsonData []byte, webhookURL string) error {
 	// Check if a swap was detected.
 	swapDetected, ok := swapDetails["swapDetected"].(bool)
 	if !ok || !swapDetected {
-		log.Println("No swap detected.")
+		// COMMENT says: "In this scenario, it should refer it to transferWebhookURL"
+		log.Println("No swap detected. Sending to transfer webhook...")
+
+		resp, err := sendToWebhook(swapDetails, transferWebhookURL)
+		if err != nil {
+			return fmt.Errorf("failed to send details to transfer webhook: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("transfer webhook returned non-OK status: %s", resp.Status)
+		}
 		return nil
 	}
 
 	log.Printf("Swap detected: %v", swapDetails)
 
-	// Send enriched details to the webhook.
+	// Send enriched details to the main webhook.
 	log.Printf("Sending enriched details to webhook: %s", webhookURL)
 	resp, err := sendToWebhook(swapDetails, webhookURL)
 	if err != nil {

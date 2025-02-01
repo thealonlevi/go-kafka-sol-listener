@@ -18,20 +18,22 @@ import (
 
 // Sniffer is responsible for processing messages and determining whether they should be sent to a webhook.
 type Sniffer struct {
-	walletManager  *wallet.WalletManager   // Manages the list of wallets to check against.
-	mutex          sync.Mutex              // Ensures thread-safe operations.
-	webhookURL     string                  // The endpoint where matched messages are sent.
-	metricsHandler *metrics.MetricsHandler // Handles metrics aggregation and reporting.
-	saveMatches    string                  // Controls whether to save matched messages.
+	walletManager      *wallet.WalletManager   // Manages the list of wallets to check against.
+	mutex              sync.Mutex              // Ensures thread-safe operations.
+	webhookURL         string                  // The endpoint where matched messages are sent.
+	metricsHandler     *metrics.MetricsHandler // Handles metrics aggregation and reporting.
+	saveMatches        string                  // Controls whether to save matched messages.
+	transferWebhookURL string                  // The endpoint where transfer-related messages are sent.
 }
 
 // NewSniffer initializes a new Sniffer with a wallet manager, webhook URL, metrics handler, and saveMatches flag.
-func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler, saveMatches string) *Sniffer {
+func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler, saveMatches string, transferWebhookURL string) *Sniffer {
 	return &Sniffer{
-		walletManager:  walletManager,
-		webhookURL:     webhookURL,
-		metricsHandler: metricsHandler,
-		saveMatches:    saveMatches,
+		walletManager:      walletManager,
+		webhookURL:         webhookURL,
+		metricsHandler:     metricsHandler,
+		saveMatches:        saveMatches,
+		transferWebhookURL: transferWebhookURL,
 	}
 }
 
@@ -230,8 +232,8 @@ func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
 		return
 	}
 
-	// Call the interpreter function with the JSON message and webhook URL.
-	err = interpreter.ProcessMessage(jsonData, s.webhookURL)
+	// Call the interpreter function with the JSON message, the main webhook URL, and the transfer webhook URL.
+	err = interpreter.ProcessMessage(jsonData, s.webhookURL, s.transferWebhookURL)
 	if err != nil {
 		log.Printf("Interpreter processing failed: %v\n", err)
 	}

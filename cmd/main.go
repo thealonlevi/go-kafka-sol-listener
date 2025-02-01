@@ -136,7 +136,7 @@ func main() {
 	go logInstanceUID()
 	go fetchSolToUsdRate()
 
-	walletManager := wallet.NewWalletManager(cfg.Application.WalletListURL, cfg.Application.WalletUpdateIntervalSeconds)
+	walletManager := wallet.NewWalletManager(cfg.Application.WalletListURL, cfg.Application.WalletUpdateInterval)
 	go walletManager.UpdateWallets()
 
 	go func() {
@@ -150,7 +150,7 @@ func main() {
 	metricsHandler := metrics.GetMetricsHandler(getInstanceUIDCache())
 	go startMetricsHandler(metricsHandler)
 
-	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL, metricsHandler, cfg.Application.SaveMatches)
+	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL, metricsHandler, cfg.Application.SaveMatches, cfg.Application.TransferWebhookURL)
 
 	for {
 		fmt.Println("Starting Kafka consumer...")
