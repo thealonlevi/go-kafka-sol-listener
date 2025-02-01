@@ -3,7 +3,7 @@ kafka:
     - "rpk0.bitquery.io:9093"
     - "rpk1.bitquery.io:9093"
     - "rpk2.bitquery.io:9093"
-  group_id: "solanatest3-group-98"
+  group_id: "solanatest3-group-97"
   topic: "solana.balance_updates"
   security:
     protocol: "SASL_SSL"
@@ -28,7 +28,7 @@ application:
 
 interpreter:
   bitquery_token: "ory_at_-mbOudJvKgJ1bSQ9upzINUpt1FHMbXHYd1Sa5yKs_ZU.DiWP8GQ7ZgbhrE1-Xdv0ibf32OfWJefg15cU0Y-mqMY"
-  python: "python"
+  python: "python3"
   swap_detector_script: "scripts/test.py"
 
 metrics:
