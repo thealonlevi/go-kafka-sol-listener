@@ -19,7 +19,7 @@ from tx_interpreter.functions.router.script import classify_transaction_detailed
 
 
 
-def load_json_data(filename="dump/json9.json"):
+def load_json_data(filename="dump/json13.json"):
     """
     Loads transaction data from a JSON file.
 
@@ -43,13 +43,11 @@ async def async_main():
     """
     try:
         input_data = sys.stdin.read()
-        data = json.loads(input_data) # am I doing this part right?
-
+        data = json.loads(input_data)
+        
         if not data:
             raise ValueError("No data loaded from JSON file.")
-        
         txtype, mints = classify_transaction_detailed(data)
-
         if txtype == "SWAP":
             result = sol_swaps(data)
         elif txtype == "TRANSFER":
