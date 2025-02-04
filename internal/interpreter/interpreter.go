@@ -23,28 +23,28 @@ func InitializeInterpreterConfig(cfg *config.Config) {
 	log.Printf("BitQuery token initialized.")
 }
 
-// ProcessMessage handles the input message, enriches it with BitQuery data, and sends the results to the webhook.
 func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL string) error {
 	log.Println("Starting ProcessMessage")
 
-	// Parse the message to extract the transaction signature.
+	// Parse the input message.
 	var message map[string]interface{}
 	if err := json.Unmarshal(jsonData, &message); err != nil {
 		return fmt.Errorf("failed to parse JSON data: %w", err)
 	}
 
+	// Extract the transaction signature.
 	signature, ok := extractSignature(message)
 	if !ok {
 		return fmt.Errorf("transaction signature not found")
 	}
 
-	// Check if the transaction has already been processed.
+	// Check if this transaction has already been processed.
 	if !utils.IsUnprocessed(signature) {
 		log.Printf("Skipping already processed signature: %s", signature)
 		return nil
 	}
 
-	// Mark the signature as being processed.
+	// Mark the signature as processed.
 	utils.AddSignature(signature)
 
 	// Invoke the Python script for swap detection.
@@ -60,36 +60,61 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		return fmt.Errorf("failed to parse Python script output: %w", err)
 	}
 
-	// Check if a swap was detected.
+	// Determine if a swap was detected.
 	swapDetected, ok := swapDetails["swapDetected"].(bool)
-	if !ok || !swapDetected {
-		// COMMENT says: "In this scenario, it should refer it to transferWebhookURL"
-		log.Println("No swap detected. Sending to transfer webhook...")
+	if !ok {
+		return fmt.Errorf("failed to determine swapDetected status")
+	}
 
+	// Define the sol-transaction API URL.
+	solAPIURL := "http://13.49.221.13:8000/api/submit"
+
+	// Prepare the packaged data which will be sent to the sol-transaction API.
+	var packagedData map[string]interface{}
+	var dataType string
+
+	if !swapDetected {
+		// No swap detected: send to the transfer webhook.
+		dataType = "transfer"
+		log.Println("No swap detected. Sending to transfer webhook...")
 		resp, err := sendToWebhook(swapDetails, transferWebhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send details to transfer webhook: %w", err)
 		}
 		defer resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("transfer webhook returned non-OK status: %s", resp.Status)
 		}
-		return nil
+	} else {
+		// Swap detected: send to the main webhook.
+		dataType = "swap"
+		log.Printf("Swap detected: %v", swapDetails)
+		log.Printf("Sending enriched details to webhook: %s", webhookURL)
+		resp, err := sendToWebhook(swapDetails, webhookURL)
+		if err != nil {
+			return fmt.Errorf("failed to send enriched details to webhook: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
+		}
 	}
 
-	log.Printf("Swap detected: %v", swapDetails)
+	// Package the data with the required structure.
+	packagedData = map[string]interface{}{
+		"data": swapDetails,
+		"type": dataType,
+	}
 
-	// Send enriched details to the main webhook.
-	log.Printf("Sending enriched details to webhook: %s", webhookURL)
-	resp, err := sendToWebhook(swapDetails, webhookURL)
+	// Send the packaged data to the sol-transaction API.
+	log.Printf("Sending packaged data to sol-transaction API: %s", solAPIURL)
+	resp, err := sendToWebhook(packagedData, solAPIURL)
 	if err != nil {
-		return fmt.Errorf("failed to send enriched details to webhook: %w", err)
+		return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
+		return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp.Status)
 	}
 
 	return nil
