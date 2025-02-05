@@ -31,6 +31,7 @@ type Config struct {
 		WebhookURL           string `yaml:"webhook_url"`
 		TransferWebhookURL   string `yaml:"transfer_webhook_url"`
 		WalletListURL        string `yaml:"wallet_list_url"`
+		DatabaseEndpoint     string `yaml:"database_endpoint"`
 		WalletUpdateInterval int    `yaml:"wallet_update_interval"`
 		UIDCharset           string `yaml:"uid_charset"`
 		SolToUsdAPIURL       string `yaml:"sol_to_usd_api_url"`

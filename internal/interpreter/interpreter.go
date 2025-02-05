@@ -23,7 +23,7 @@ func InitializeInterpreterConfig(cfg *config.Config) {
 	log.Printf("BitQuery token initialized.")
 }
 
-func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL string) error {
+func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL string, databaseEndpoint string) error {
 	log.Println("Starting ProcessMessage")
 
 	// Parse the input message.
@@ -66,9 +66,6 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		return fmt.Errorf("failed to determine swapDetected status")
 	}
 
-	// Define the sol-transaction API URL.
-	solAPIURL := "http://13.49.221.13:8000/api/submit"
-
 	// Prepare the packaged data which will be sent to the sol-transaction API.
 	var packagedData map[string]interface{}
 	var dataType string
@@ -107,8 +104,8 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 	}
 
 	// Send the packaged data to the sol-transaction API.
-	log.Printf("Sending packaged data to sol-transaction API: %s", solAPIURL)
-	resp, err := sendToWebhook(packagedData, solAPIURL)
+	log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
+	resp, err := sendToWebhook(packagedData, databaseEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err)
 	}

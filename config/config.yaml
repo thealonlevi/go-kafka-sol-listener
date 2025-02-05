@@ -21,6 +21,7 @@ application:
   webhook_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/transactionWebhookV2"
   transfer_webhook_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/transferWebhook"
   wallet_list_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/getWalletList"
+  database_endpoint: "http://13.49.221.13:8000/api/submit"
   wallet_update_interval: 30
   uid_charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
   sol_to_usd_api_url: "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"

@@ -150,7 +150,7 @@ func main() {
 	metricsHandler := metrics.GetMetricsHandler(getInstanceUIDCache())
 	go startMetricsHandler(metricsHandler)
 
-	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL, metricsHandler, cfg.Application.SaveMatches, cfg.Application.TransferWebhookURL)
+	snifferInstance := sniffer.NewSniffer(walletManager, cfg.Application.WebhookURL, metricsHandler, cfg.Application.SaveMatches, cfg.Application.TransferWebhookURL, cfg.Application.DatabaseEndpoint)
 
 	for {
 		fmt.Println("Starting Kafka consumer...")

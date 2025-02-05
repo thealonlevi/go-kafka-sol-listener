@@ -24,16 +24,18 @@ type Sniffer struct {
 	metricsHandler     *metrics.MetricsHandler // Handles metrics aggregation and reporting.
 	saveMatches        string                  // Controls whether to save matched messages.
 	transferWebhookURL string                  // The endpoint where transfer-related messages are sent.
+	databaseEndpoint   string
 }
 
 // NewSniffer initializes a new Sniffer with a wallet manager, webhook URL, metrics handler, and saveMatches flag.
-func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler, saveMatches string, transferWebhookURL string) *Sniffer {
+func NewSniffer(walletManager *wallet.WalletManager, webhookURL string, metricsHandler *metrics.MetricsHandler, saveMatches string, transferWebhookURL string, databaseEndpoint string) *Sniffer {
 	return &Sniffer{
 		walletManager:      walletManager,
 		webhookURL:         webhookURL,
 		metricsHandler:     metricsHandler,
 		saveMatches:        saveMatches,
 		transferWebhookURL: transferWebhookURL,
+		databaseEndpoint:   databaseEndpoint,
 	}
 }
 
@@ -225,7 +227,7 @@ func (s *Sniffer) processWithInterpreter(message map[string]interface{}) {
 	}
 
 	// Call the interpreter function with the JSON message, the main webhook URL, and the transfer webhook URL.
-	err = interpreter.ProcessMessage(jsonData, s.webhookURL, s.transferWebhookURL)
+	err = interpreter.ProcessMessage(jsonData, s.webhookURL, s.transferWebhookURL, s.databaseEndpoint)
 	if err != nil {
 		log.Printf("Interpreter processing failed: %v\n", err)
 	}
