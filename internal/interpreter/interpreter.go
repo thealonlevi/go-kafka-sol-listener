@@ -68,11 +68,25 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 
 	// Prepare the packaged data which will be sent to the sol-transaction API.
 	var packagedData map[string]interface{}
-	var dataType string
 
 	if !swapDetected {
 		// No swap detected: send to the transfer webhook.
-		dataType = "transfer"
+		// Package the data with the required structure.
+		packagedData = map[string]interface{}{
+			"data": swapDetails,
+			"type": "transfer",
+		}
+
+		// Send the packaged data to the sol-transaction API.
+		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
+		resp2, err2 := sendToWebhook(packagedData, databaseEndpoint)
+		if err2 != nil {
+			return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err2)
+		}
+		defer resp2.Body.Close()
+		if resp2.StatusCode != http.StatusOK {
+			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
+		}
 		log.Println("No swap detected. Sending to transfer webhook...")
 		resp, err := sendToWebhook(swapDetails, transferWebhookURL)
 		if err != nil {
@@ -83,10 +97,26 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 			return fmt.Errorf("transfer webhook returned non-OK status: %s", resp.Status)
 		}
 	} else {
+		// Package the data with the required structure.
+		packagedData = map[string]interface{}{
+			"data": swapDetails,
+			"type": "swap",
+		}
+
+		// Send the packaged data to the sol-transaction API.
+		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
+		resp2, err2 := sendToWebhook(packagedData, databaseEndpoint)
+		if err2 != nil {
+			return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err2)
+		}
+		defer resp2.Body.Close()
+		if resp2.StatusCode != http.StatusOK {
+			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
+		}
 		// Swap detected: send to the main webhook.
-		dataType = "swap"
 		log.Printf("Swap detected: %v", swapDetails)
 		log.Printf("Sending enriched details to webhook: %s", webhookURL)
+
 		resp, err := sendToWebhook(swapDetails, webhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send enriched details to webhook: %w", err)
@@ -95,23 +125,6 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
 		}
-	}
-
-	// Package the data with the required structure.
-	packagedData = map[string]interface{}{
-		"data": swapDetails,
-		"type": dataType,
-	}
-
-	// Send the packaged data to the sol-transaction API.
-	log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
-	resp, err := sendToWebhook(packagedData, databaseEndpoint)
-	if err != nil {
-		return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp.Status)
 	}
 
 	return nil
