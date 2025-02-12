@@ -19,7 +19,7 @@ from tx_interpreter.functions.router.script import classify_transaction_detailed
 
 
 
-def load_json_data(filename="dump/json13.json"):
+def load_json_data(filename="dump/json14.json"):
     """
     Loads transaction data from a JSON file.
 
@@ -32,6 +32,7 @@ def load_json_data(filename="dump/json13.json"):
     try:
         with open(filename, "r", encoding="utf-8") as f:
             data = json.load(f)
+            data['solUsdRate']=200
             return data
     except Exception as e:
         return {}
@@ -44,6 +45,8 @@ async def async_main():
     try:
         input_data = sys.stdin.read()
         data = json.loads(input_data)
+        
+        #data = load_json_data()
         
         if not data:
             raise ValueError("No data loaded from JSON file.")
