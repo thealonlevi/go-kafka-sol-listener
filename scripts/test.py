@@ -53,8 +53,8 @@ async def async_main():
             raise ValueError("No data loaded from JSON file.")
         txtype, mints = classify_transaction_detailed(data)
         if txtype == "SWAP":
-            #result = sol_swaps(data)
-            result = testing(data)
+            result = sol_swaps(data)
+            #result = testing(data)
         elif txtype == "TRANSFER":
             if not mints:
                 raise ValueError("No mints found for TRANSFER transaction.")
