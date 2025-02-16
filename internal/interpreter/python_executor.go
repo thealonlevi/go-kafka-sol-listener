@@ -33,6 +33,7 @@ func invokePythonScript(jsonData []byte) (string, error) {
 
 	// 3. Add the SOL-USD rate into that map
 	baseData["solUsdRate"] = rate
+	log.Println(baseData["Transaction"])
 
 	// 4. Marshal the updated data
 	updatedJSON, err := json.Marshal(baseData)
