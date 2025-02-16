@@ -20,7 +20,7 @@ from tx_interpreter.functions.router.script import classify_transaction_detailed
 from tx_interpreter.functions.sol_swaps.script2 import main as testing
 
 
-def load_json_data(filename="dump/json6.json"):
+def load_json_data(filename="dump/json16.json"):
     """
     Loads transaction data from a JSON file.
 
