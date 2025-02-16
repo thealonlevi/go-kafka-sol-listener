@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go-kafka-sol-listener/internal/config"
 	"go-kafka-sol-listener/internal/utils"
-	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -14,7 +13,7 @@ var pythonInterpreter string
 var swapDetectorScript string
 var bitqueryToken string
 
-// InitializeInterpreterConfig initializes the BitQuery token and script paths from the configuration.
+// Initialize the BitQuery token and script paths from the configuration.
 func InitializeInterpreterConfig(cfg *config.Config) {
 	pythonInterpreter = cfg.Interpreter.Python
 	swapDetectorScript = cfg.Interpreter.SwapDetectorScript
@@ -24,7 +23,6 @@ func InitializeInterpreterConfig(cfg *config.Config) {
 	log.Printf("BitQuery token initialized.")
 }
 
-// ProcessMessage handles incoming messages, invokes the Python script, and routes swaps/transfers.
 func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL string, databaseEndpoint string) error {
 	log.Println("Starting ProcessMessage")
 
@@ -69,13 +67,15 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 	}
 
 	// Prepare the packaged data which will be sent to the sol-transaction API.
-	var packagedData = map[string]interface{}{
-		"data": swapDetails,
-	}
+	var packagedData map[string]interface{}
 
 	if !swapDetected {
-		// Mark the operation type as "transfer" when no swap is detected.
-		packagedData["type"] = "transfer"
+		// No swap detected: send to the transfer webhook.
+		// Package the data with the required structure.
+		packagedData = map[string]interface{}{
+			"data": swapDetails,
+			"type": "transfer",
+		}
 
 		// Send the packaged data to the sol-transaction API.
 		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
@@ -84,25 +84,24 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 			return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err2)
 		}
 		defer resp2.Body.Close()
-
 		if resp2.StatusCode != http.StatusOK {
 			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
 		}
-
 		log.Println("No swap detected. Sending to transfer webhook...")
 		resp, err := sendToWebhook(swapDetails, transferWebhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send details to transfer webhook: %w", err)
 		}
 		defer resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("transfer webhook returned non-OK status: %s", resp.Status)
 		}
-
 	} else {
-		// Mark the operation type as "swap".
-		packagedData["type"] = "swap"
+		// Package the data with the required structure.
+		packagedData = map[string]interface{}{
+			"data": swapDetails,
+			"type": "swap",
+		}
 
 		// Send the packaged data to the sol-transaction API.
 		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
@@ -111,38 +110,24 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 			return fmt.Errorf("failed to send packaged data to sol-transaction API: %w", err2)
 		}
 		defer resp2.Body.Close()
-
 		if resp2.StatusCode != http.StatusOK {
 			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
 		}
-
-		// Attempt to read the realized_pnl from sol-transaction API's response.
-		bodyBytes, err := ioutil.ReadAll(resp2.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read sol-transaction API response body: %w", err)
-		}
-
-		// Example top-level structure: {"status": "received", "realized_pnl": 123.45}
-		var solTxResp map[string]interface{}
-		if err := json.Unmarshal(bodyBytes, &solTxResp); err != nil {
-			return fmt.Errorf("failed to unmarshal sol-transaction API response: %w", err)
-		}
-
-		// If realized_pnl is present, attach it to swapDetails before sending it forward
-		if rPnl, hasRPnl := solTxResp["realized_pnl"]; hasRPnl {
-			swapDetails["realized_pnl"] = rPnl
-		}
-
 		// Swap detected: send to the main webhook.
 		log.Printf("Swap detected: %v", swapDetails)
 		log.Printf("Sending enriched details to webhook: %s", webhookURL)
+
+		// Just read the response JSON from resp2 and set realized_pnl on swapDetails
+		var respBody map[string]interface{}
+		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
+			swapDetails["realized_pnl"] = respBody["realized_pnl"]
+		}
 
 		resp, err := sendToWebhook(swapDetails, webhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send enriched details to webhook: %w", err)
 		}
 		defer resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
 		}
