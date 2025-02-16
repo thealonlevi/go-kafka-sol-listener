@@ -117,12 +117,6 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		log.Printf("Swap detected: %v", swapDetails)
 		log.Printf("Sending enriched details to webhook: %s", webhookURL)
 
-		// Just read the response JSON from resp2 and set realized_pnl on swapDetails
-		var respBody map[string]interface{}
-		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
-			swapDetails["realized_pnl"] = respBody["realized_pnl"]
-		}
-
 		resp, err := sendToWebhook(swapDetails, webhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send enriched details to webhook: %w", err)
