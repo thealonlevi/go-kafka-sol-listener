@@ -17,9 +17,10 @@ from tx_interpreter.functions.sol_swaps.script import sol_swaps
 from tx_interpreter.functions.transfers.script import main
 from tx_interpreter.functions.router.script import classify_transaction_detailed
 
+from tx_interpreter.functions.sol_swaps.script2 import main as testing
 
 
-def load_json_data(filename="dump/json14.json"):
+def load_json_data(filename="dump/json6.json"):
     """
     Loads transaction data from a JSON file.
 
@@ -51,8 +52,10 @@ async def async_main():
         if not data:
             raise ValueError("No data loaded from JSON file.")
         txtype, mints = classify_transaction_detailed(data)
+        print(txtype)
         if txtype == "SWAP":
-            result = sol_swaps(data)
+            #result = sol_swaps(data)
+            result = testing(data)
         elif txtype == "TRANSFER":
             if not mints:
                 raise ValueError("No mints found for TRANSFER transaction.")
