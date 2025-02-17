@@ -71,13 +71,12 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 
 	if !swapDetected {
 		// No swap detected: send to the transfer webhook.
-		// Package the data with the required structure.
 		packagedData = map[string]interface{}{
 			"data": swapDetails,
 			"type": "transfer",
 		}
 
-		// Send the packaged data to the sol-transaction API.
+		// Send to the sol-transaction API.
 		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
 		resp2, err2 := sendToWebhook(packagedData, databaseEndpoint)
 		if err2 != nil {
@@ -87,6 +86,8 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		if resp2.StatusCode != http.StatusOK {
 			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
 		}
+
+		// Now send to the transfer webhook.
 		log.Println("No swap detected. Sending to transfer webhook...")
 		resp, err := sendToWebhook(swapDetails, transferWebhookURL)
 		if err != nil {
@@ -96,14 +97,29 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("transfer webhook returned non-OK status: %s", resp.Status)
 		}
+
+		// Also send to the dashboard API.
+		dashboardPayload := map[string]interface{}{
+			"type": "transfer",
+			"data": swapDetails,
+		}
+		dashResp, dashErr := sendToWebhook(dashboardPayload, "http://13.49.221.13:8082/api/data")
+		if dashErr != nil {
+			return fmt.Errorf("failed to send details to dashboard: %w", dashErr)
+		}
+		defer dashResp.Body.Close()
+		if dashResp.StatusCode != http.StatusOK {
+			return fmt.Errorf("dashboard returned non-OK status: %s", dashResp.Status)
+		}
+
 	} else {
-		// Package the data with the required structure.
+		// A swap was detected.
 		packagedData = map[string]interface{}{
 			"data": swapDetails,
 			"type": "swap",
 		}
 
-		// Send the packaged data to the sol-transaction API.
+		// Send to the sol-transaction API.
 		log.Printf("Sending packaged data to sol-transaction API: %s", databaseEndpoint)
 		resp2, err2 := sendToWebhook(packagedData, databaseEndpoint)
 		if err2 != nil {
@@ -113,16 +129,16 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		if resp2.StatusCode != http.StatusOK {
 			return fmt.Errorf("sol-transaction API returned non-OK status: %s", resp2.Status)
 		}
-		// Swap detected: send to the main webhook.
-		log.Printf("Swap detected: %v", swapDetails)
-		log.Printf("Sending enriched details to webhook: %s", webhookURL)
 
-		// Just read the response JSON from resp2 and set realized_pnl on swapDetails
+		// Read the response from sol-transaction; set realized_pnl.
 		var respBody map[string]interface{}
 		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
 			swapDetails["realized_pnl"] = respBody["realized_pnl"]
 		}
 
+		// Send the enriched details to the main webhook.
+		log.Printf("Swap detected: %v", swapDetails)
+		log.Printf("Sending enriched details to webhook: %s", webhookURL)
 		resp, err := sendToWebhook(swapDetails, webhookURL)
 		if err != nil {
 			return fmt.Errorf("failed to send enriched details to webhook: %w", err)
@@ -130,6 +146,20 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("webhook returned non-OK status: %s", resp.Status)
+		}
+
+		// Also send to the dashboard API.
+		dashboardPayload := map[string]interface{}{
+			"type": "swap",
+			"data": swapDetails,
+		}
+		dashResp, dashErr := sendToWebhook(dashboardPayload, "http://13.49.221.13:8082/api/data")
+		if dashErr != nil {
+			return fmt.Errorf("failed to send details to dashboard: %w", dashErr)
+		}
+		defer dashResp.Body.Close()
+		if dashResp.StatusCode != http.StatusOK {
+			return fmt.Errorf("dashboard returned non-OK status: %s", dashResp.Status)
 		}
 	}
 
