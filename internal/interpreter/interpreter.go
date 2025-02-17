@@ -52,11 +52,7 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 	if err != nil {
 		return fmt.Errorf("failed to invoke Python script: %w", err)
 	}
-	var baseData map[string]interface{}
-	if err := json.Unmarshal(jsonData, &baseData); err != nil {
-	}
-	log.Println("Pre: ")
-	log.Println(baseData["Transaction"])
+
 	log.Printf("Python script output: %s", result)
 
 	var swapDetails map[string]interface{}
@@ -120,6 +116,12 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		// Swap detected: send to the main webhook.
 		log.Printf("Swap detected: %v", swapDetails)
 		log.Printf("Sending enriched details to webhook: %s", webhookURL)
+
+		// Just read the response JSON from resp2 and set realized_pnl on swapDetails
+		var respBody map[string]interface{}
+		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
+			swapDetails["realized_pnl"] = respBody["realized_pnl"]
+		}
 
 		resp, err := sendToWebhook(swapDetails, webhookURL)
 		if err != nil {
