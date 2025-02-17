@@ -57,6 +57,22 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 
 	var swapDetails map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &swapDetails); err != nil {
+		// Build a debug payload that includes the entire Python script output
+		// and the entire input we sent to the Python script.
+		debugPayload := map[string]interface{}{
+			"source": "interpreter",
+			"debug_info": map[string]interface{}{
+				"python_script_input":  string(jsonData),
+				"python_script_output": result,
+			},
+		}
+
+		// Send this debug info to the error endpoint.
+		_, debugErr := sendToWebhook(debugPayload, "http://13.49.221.13:8082/api/errors")
+		if debugErr != nil {
+			log.Printf("Failed to send debug info to http://13.49.221.13:8082/api/errors: %v", debugErr)
+		}
+
 		return fmt.Errorf("failed to parse Python script output: %w", err)
 	}
 
@@ -134,6 +150,7 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		var respBody map[string]interface{}
 		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
 			swapDetails["realized_pnl"] = respBody["realized_pnl"]
+			swapDetails["user_pnls"] = respBody["user_pnls"]
 		}
 
 		// Send the enriched details to the main webhook.
