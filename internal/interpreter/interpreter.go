@@ -149,8 +149,7 @@ func ProcessMessage(jsonData []byte, webhookURL string, transferWebhookURL strin
 		// Read the response from sol-transaction; set realized_pnl.
 		var respBody map[string]interface{}
 		if err := json.NewDecoder(resp2.Body).Decode(&respBody); err == nil {
-			swapDetails["realized_pnl"] = respBody["realized_pnl"]
-			swapDetails["user_pnls"] = respBody["user_pnls"]
+			swapDetails["pnl_data"] = respBody["pnl_data"]
 		}
 
 		// Send the enriched details to the main webhook.
