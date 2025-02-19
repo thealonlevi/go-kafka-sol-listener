@@ -18,10 +18,10 @@ kafka:
   poll_interval_ms: 250
 
 application:
-  webhook_url: "https://127.0.0.1:6000/api/swaps"
-  transfer_webhook_url: "http://127.0.0.1:6000/api/transfers"
+  webhook_url: "https://13.49.221.13:6000/api/swaps"
+  transfer_webhook_url: "http://13.49.221.13:6000/api/transfers"
   wallet_list_url: "https://v5gegme2a6.execute-api.eu-north-1.amazonaws.com/default/getWalletList"
-  database_endpoint: "http://127.0.0.1:8000/api/submit"
+  database_endpoint: "http://13.49.221.13:8000/api/submit"
   wallet_update_interval: 30
   uid_charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
   sol_to_usd_api_url: "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
